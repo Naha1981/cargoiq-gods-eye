@@ -355,7 +355,8 @@
 
   // ---------- start ----------
   setStatus('warm', 'CONNECTING');
-  flyTo('durban');
+  var deepLink = new URLSearchParams(location.search).get('fly');
+  flyTo(VIEW[deepLink] ? deepLink : 'durban');
   connectLive();
   setTimeout(function () { if (!liveConnected) loadSnapshot(); }, 8000);
 })();
