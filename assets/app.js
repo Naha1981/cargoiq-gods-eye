@@ -973,7 +973,7 @@
             position: new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(vv.lon, vv.lat)),
             point: {
               pixelSize: 7,
-              color: Cesium.Color.fromCssColorString('#94a3b8'),
+              color: (SCRUB.evidence && t >= CASE.events[0].ts && t <= CASE.events[3].ts) ? Cesium.Color.fromCssColorString('#ef4444') : Cesium.Color.fromCssColorString('#94a3b8'),
               outlineColor: Cesium.Color.fromCssColorString('#38bdf8'), outlineWidth: 1,
               disableDepthTestDistance: Number.POSITIVE_INFINITY
             },
@@ -991,6 +991,9 @@
         $('scrub-readout').textContent = fmtSAST(t) + ' SAST | positions as of ' + fmtHour(best.ts) + ' SAST' + wtxt;
       });
     }
+    var inWindow = SCRUB.evidence && t >= CASE.events[0].ts && t <= CASE.events[3].ts;
+    $('scrub-readout').classList.toggle('in-window', !!inWindow);
+    if (inWindow) $('scrub-readout').textContent = 'DISPUTED WINDOW - ' + $('scrub-readout').textContent;
     // evidence pins: highlight within 45min, dim future pins
     evidenceEntities.forEach(function (e) {
       var dt = e._evidence.ts - t;
@@ -1045,7 +1048,10 @@
     items.forEach(function (it) {
       var div = document.createElement('div');
       div.className = 'case-event';
-      div.innerHTML = '<div class="t">' + fmtSAST(it.ts) + ' SAST - ' + (it.kind === 'evidence' ? 'EVIDENCE' : 'EVENT') + '</div><div><b>' + it.title + '</b></div><div class="d">' + it.desc + '</div>';
+      var extra = '';
+      if (it.ref && it.ref.provenance) extra += ' <span class="prov prov-' + it.ref.provenance + '">' + it.ref.provenance + '</span>';
+      if (it.ref && it.ref.linked) extra += ' <span class="linked-badge">LINKED</span>';
+      div.innerHTML = '<div class="t">' + fmtSAST(it.ts) + ' SAST - ' + (it.kind === 'evidence' ? 'EVIDENCE' : 'EVENT') + '</div><div><b>' + it.title + '</b>' + extra + '</div><div class="d">' + it.desc + '</div>';
       if (it.ref) div.addEventListener('click', function () { openEvidence(it.ref); });
       tl.appendChild(div);
     });

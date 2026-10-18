@@ -11,7 +11,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
@@ -244,7 +244,7 @@ body {
 :root { --disputed: oklch(0.68 0.2 25); --dispute: #ef4444; }
 .dispute-badge {
   display: inline-flex; align-items: center; gap: 5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   text-transform: uppercase;
   background: color-mix(in srgb, var(--disputed) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--disputed) 40%, transparent);
@@ -284,6 +284,20 @@ body {
   border-radius: 12px; padding: 10px 13px; box-shadow: 0 12px 40px rgba(0,0,0,0.55);
 }
 #fp-step { font-size: 12.5px; font-weight: 700; color: #fca5a5; }
-#fp-tele { font-size: 11px; color: var(--muted); margin-top: 3px; font-family: ui-monospace, monospace; }
+#fp-tele { font-size: 11px; color: var(--muted); margin-top: 3px; font-family: 'JetBrains Mono', ui-monospace, monospace; }
 #fp-cap { font-size: 12.5px; line-height: 1.4; margin-top: 5px; }
 #fp-stop { position: absolute; top: 8px; right: 10px; }
+
+/* provenance chips (shared spec) */
+.prov { display: inline-block; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 8.5px; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase; border-radius: 5px; padding: 1px 6px; margin-left: 6px; border: 1px solid; }
+.prov-observed { color: oklch(0.78 0.13 175); border-color: oklch(0.78 0.13 175 / 0.5); }
+.prov-reported { color: oklch(0.72 0.12 245); border-color: oklch(0.72 0.12 245 / 0.5); }
+.prov-derived { color: oklch(0.82 0.15 75); border-color: oklch(0.82 0.15 75 / 0.5); }
+.prov-inferred { color: oklch(0.7 0.03 240); border-color: oklch(0.7 0.03 240 / 0.5); }
+.linked-badge { display: inline-block; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 8.5px; font-weight: 800;
+  letter-spacing: 0.08em; border-radius: 5px; padding: 1px 6px; margin-left: 6px;
+  color: #fca5a5; border: 1px solid color-mix(in srgb, var(--disputed) 40%, transparent); }
+#scrub-readout.in-window { font-family: 'JetBrains Mono', ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.06em; color: #fca5a5; }
+.support-line { margin-top: 8px; font-size: 11px; color: var(--muted); }
+.support-line a { color: #7dd3fc; text-decoration: none; }
