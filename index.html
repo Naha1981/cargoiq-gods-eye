@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="assets/styles.css">
 <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/';</script>
 <script src="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Cesium.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="cesiumContainer"></div>
@@ -24,7 +25,25 @@
   <div id="scrub-bar" class="hidden">
     <div id="scrub-readout">Live - now</div>
     <input id="scrub-slider" type="range" min="0" max="384" value="288" step="1">
+    <div id="scrub-track"><div id="scrub-window"><span>DISPUTE WINDOW</span></div></div>
     <div id="scrub-ends"><span id="scrub-min"></span><span id="scrub-max"></span></div>
+  </div>
+
+  <div id="case-card" class="card hidden">
+    <button id="case-close" class="close-x" aria-label="Close">&times;</button>
+    <h3>Case DUR-2026-0412</h3>
+    <div class="kv">
+      <dt>Container</dt><dd>MSKU 482931 7</dd>
+      <dt>Vessel</dt><dd>MV Umhlanga Trader</dd>
+      <dt>Issue</dt><dd>Demurrage: free-time expiry vs berthing delay</dd>
+    </div>
+    <div id="case-timeline"></div>
+    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+      <button id="case-replay" class="mini-btn">Replay</button>
+      <button id="case-share" class="mini-btn">Copy replay link</button>
+      <button id="case-pdf" class="mini-btn">Evidence pack PDF</button>
+    </div>
+    <div class="fine">Sample data. Fictional records.</div>
   </div>
   <div id="ev-card" class="card hidden">
     <button id="ev-close" class="close-x" aria-label="Close">&times;</button>

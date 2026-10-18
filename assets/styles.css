@@ -233,3 +233,28 @@ body {
 #scrub-bar.scrubbed #scrub-readout { color: #fbbf24; }
 #ev-img { width: 100%; border-radius: 10px; margin-top: 8px; }
 .ev-dim { opacity: 0.25; }
+
+/* case dossier */
+#case-timeline { margin-top: 8px; max-height: 30vh; overflow-y: auto; }
+.case-event { border-left: 2px solid #ef4444; padding: 4px 0 4px 10px; margin: 6px 0; font-size: 12.5px; }
+.case-event .t { color: #7dd3fc; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; }
+.case-event .d { color: var(--muted); margin-top: 1px; }
+
+/* consistent dispute marking */
+:root { --dispute: #ef4444; }
+.dispute-badge {
+  display: inline-block; background: var(--dispute); color: #fff;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+  border-radius: 6px; padding: 2px 6px; vertical-align: middle; margin-left: 6px;
+}
+#scrub-track { position: relative; height: 0; }
+#scrub-window {
+  position: absolute; top: -22px; height: 18px;
+  background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.55); border-radius: 4px;
+  pointer-events: none;
+}
+#scrub-window span {
+  position: absolute; top: -13px; left: 0; font-size: 8px; font-weight: 800;
+  letter-spacing: 0.1em; color: #fca5a5; white-space: nowrap;
+}
+#case-card h3, #ev-card h3 { color: #fca5a5; }

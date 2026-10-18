@@ -467,6 +467,9 @@
     });
     return best;
   }
+  document.querySelector('[data-target=\'dispute\']').addEventListener('click', function () {
+    setTimeout(openCase, 2700);
+  });
   $('dispute-cam').addEventListener('click', function () {
     var c = nearestCamTo(DISPUTE.lon, DISPUTE.lat);
     if (c) { openCam(c); flyToPoint(c.lon, c.lat, 6000); }
@@ -735,6 +738,9 @@
         resolved = 'miss:vessel:' + name;
         cargoSay('I could not find that vessel in the current feed. Try its name as shown on the map.', null);
       }
+    } else if (caseIntent(t)) {
+      openCase(); resolved = 'case:' + CASE.id;
+      cargoSay('Case DUR-2026-0412. Container MSKU 482931 7, demurrage dispute. Timeline and evidence on screen.', 'dispute');
     } else {
       var placed = false;
       for (var p = 0; p < VOICE_TERMINALS.length; p++) {
@@ -821,13 +827,13 @@
         position: new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(item.lon, item.lat)),
         point: {
           pixelSize: 10,
-          color: Cesium.Color.fromCssColorString('#f472b6'),
+          color: Cesium.Color.fromCssColorString('#ef4444'),
           outlineColor: Cesium.Color.WHITE, outlineWidth: 1.5,
           disableDepthTestDistance: Number.POSITIVE_INFINITY
         },
         label: {
           text: 'EV', font: 'bold 10px sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#f9a8d4'),
+          fillColor: Cesium.Color.fromCssColorString('#fca5a5'),
           outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           pixelOffset: new Cesium.Cartesian2(0, -18),
@@ -860,7 +866,7 @@
     img.classList.remove('hidden');
   }
   function openEvidence(item) {
-    $('ev-title').textContent = item.title;
+    $('ev-title').innerHTML = item.title + ' <span class="dispute-badge">DISPUTE ' + (SCRUB.evidence ? SCRUB.evidence.case : '') + '</span>';
     $('ev-desc').textContent = item.desc;
     if (item.type === 'cam') {
       camFrameFor(item, SCRUB.t || Date.now() / 1000);
@@ -977,9 +983,9 @@
     // evidence pins: highlight within 45min, dim future pins
     evidenceEntities.forEach(function (e) {
       var dt = e._evidence.ts - t;
-      if (dt > 2700) { e.point.pixelSize = 6; e.point.color = Cesium.Color.fromCssColorString('#f472b6').withAlpha(0.3); }
-      else if (Math.abs(dt) <= 2700) { e.point.pixelSize = 14; e.point.color = Cesium.Color.fromCssColorString('#f472b6'); }
-      else { e.point.pixelSize = 10; e.point.color = Cesium.Color.fromCssColorString('#f472b6').withAlpha(0.75); }
+      if (dt > 2700) { e.point.pixelSize = 6; e.point.color = Cesium.Color.fromCssColorString('#ef4444').withAlpha(0.3); }
+      else if (Math.abs(dt) <= 2700) { e.point.pixelSize = 14; e.point.color = Cesium.Color.fromCssColorString('#ef4444'); }
+      else { e.point.pixelSize = 10; e.point.color = Cesium.Color.fromCssColorString('#ef4444').withAlpha(0.75); }
     });
   }
   var slider = $('scrub-slider');
@@ -1000,8 +1006,87 @@
     }
     $('scrub-min').textContent = fmtSAST(NOW_MIN);
     $('scrub-max').textContent = fmtSAST(NOW_MIN + 384 * 900);
+    var w = $('scrub-window');
+    var lo = Math.max(0, (CASE.events[0].ts - NOW_MIN) / 900), hi = Math.min(384, (CASE.events[3].ts - NOW_MIN) / 900);
+    w.style.left = (lo / 384 * 100) + '%';
+    w.style.width = ((hi - lo) / 384 * 100) + '%';
   });
 
+
+  // ---------- case dossier + export (items 3+4) ----------
+  var CASE = {
+    id: 'DUR-2026-0412', container: 'MSKU 482931 7', vessel: 'MV Umhlanga Trader',
+    events: [
+      { ts: 1792210320, title: 'Arrival - outer anchorage', desc: 'Vessel arrives off Durban. Waiting time starts in the carrier account.' },
+      { ts: 1792240800, title: 'Berthing - DGT berth 108', desc: 'Terminal says the berth was ready earlier; carrier disagrees.' },
+      { ts: 1792253100, title: 'Free time expires', desc: 'Container free time expires while the clock is disputed.' },
+      { ts: 1792307700, title: 'Demurrage invoice issued', desc: 'Invoice raised. Evidence pack BLOCKED: 2 open contradictions.' }
+    ]
+  };
+  function openCase() {
+    var tl = $('case-timeline');
+    tl.innerHTML = '';
+    var items = CASE.events.map(function (e) { return { ts: e.ts, title: e.title, desc: e.desc, kind: 'event' }; });
+    if (SCRUB.evidence) {
+      SCRUB.evidence.items.forEach(function (i) { items.push({ ts: i.ts, title: i.title, desc: i.desc, kind: 'evidence', ref: i }); });
+    }
+    items.sort(function (a, b) { return a.ts - b.ts; });
+    items.forEach(function (it) {
+      var div = document.createElement('div');
+      div.className = 'case-event';
+      div.innerHTML = '<div class="t">' + fmtSAST(it.ts) + ' SAST - ' + (it.kind === 'evidence' ? 'EVIDENCE' : 'EVENT') + '</div><div><b>' + it.title + '</b></div><div class="d">' + it.desc + '</div>';
+      if (it.ref) div.addEventListener('click', function () { openEvidence(it.ref); });
+      tl.appendChild(div);
+    });
+    $('case-card').classList.remove('hidden');
+  }
+  $('case-close').addEventListener('click', function () { $('case-card').classList.add('hidden'); });
+  $('case-replay').addEventListener('click', function () { $('case-card').classList.add('hidden'); startReplay(); });
+  $('case-share').addEventListener('click', function () {
+    var url = 'https://nahalabs.co.za/gods-eye/?case=' + CASE.id + '&replay=1';
+    if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function () {});
+    cargoSay('Replay link copied: ' + url, null);
+  });
+  $('case-pdf').addEventListener('click', function () {
+    try {
+      var doc = new window.jspdf.jsPDF();
+      var y = 18;
+      doc.setFontSize(16); doc.text('CargoIQ Evidence Pack - Case ' + CASE.id, 14, y); y += 8;
+      doc.setFontSize(10);
+      doc.text('Container: ' + CASE.container + '   Vessel: ' + CASE.vessel, 14, y); y += 6;
+      doc.text('Issue: Demurrage - free-time expiry vs berthing delay (2 open contradictions)', 14, y); y += 6;
+      doc.text('Sample data. Fictional records.', 14, y); y += 10;
+      doc.setFontSize(12); doc.text('Timeline (SAST)', 14, y); y += 7;
+      doc.setFontSize(10);
+      CASE.events.forEach(function (e) {
+        doc.text(fmtSAST(e.ts) + '  ' + e.title, 14, y); y += 5;
+        var lines = doc.splitTextToSize(e.desc, 175);
+        doc.text(lines, 20, y); y += lines.length * 5 + 2;
+      });
+      if (SCRUB.evidence) {
+        y += 4; doc.setFontSize(12); doc.text('Evidence on record', 14, y); y += 7; doc.setFontSize(10);
+        SCRUB.evidence.items.forEach(function (i) {
+          doc.text(fmtSAST(i.ts) + '  [' + i.type + '] ' + i.title, 14, y); y += 6;
+        });
+      }
+      var wi = SCRUB.wx && SCRUB.wx.time ? nearestHourly(SCRUB.wx, CASE.events[1].ts) : null;
+      var mi = SCRUB.marine && SCRUB.marine.time ? nearestHourly(SCRUB.marine, CASE.events[1].ts) : null;
+      if (wi !== null) {
+        y += 4; doc.setFontSize(12); doc.text('Conditions at berthing window (Open-Meteo, CC BY 4.0)', 14, y); y += 7; doc.setFontSize(10);
+        doc.text('Wind ' + Math.round(SCRUB.wx.wind_speed_10m[wi]) + ' kn, gusts ' + Math.round(SCRUB.wx.wind_gusts_10m[wi]) + ' kn', 14, y); y += 5;
+        if (mi !== null && SCRUB.marine.wave_height[mi] != null) { doc.text('Waves ' + SCRUB.marine.wave_height[mi] + ' m', 14, y); y += 5; }
+      }
+      y += 6;
+      doc.text('Live replay: https://nahalabs.co.za/gods-eye/?case=' + CASE.id + '&replay=1', 14, y);
+      doc.save(CASE.id + '-evidence-pack.pdf');
+      cargoSay('Evidence pack PDF downloaded for case ' + CASE.id + '.', null);
+    } catch (e) {
+      cargoSay('PDF export failed in this browser. The replay link still works.', null);
+    }
+  });
+  function caseIntent(t) {
+    return /everything about|tell me about|show me the case|the case|evidence pack|dossier|msku|musku|482931|4 8 2 9 3 1/.test(t);
+  }
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);
   var wantVessel = qs.get('vessel');
@@ -1023,6 +1108,7 @@
   if (qs.get('replay') === '1') { setTimeout(startReplay, 2500); }
   if (qs.get('cond') === '1') { $('cond-panel').classList.remove('hidden'); loadConditions(); }
   if (qs.get('scrub') === '1') { $('scrub-chip').click(); }
+  if (qs.get('case')) { setTimeout(openCase, 2200); }
   if (qs.get('say')) { setTimeout(function () { handleVoiceCommand(qs.get('say')); }, 3000); }
 
   // ---------- start ----------
