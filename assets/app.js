@@ -555,12 +555,17 @@
 
 
   // ---------- voice commands (push-to-talk + typed fallback) ----------
-  var voiceRepliesAudio = {};
+  var voiceRepliesAudio = {}, voiceToastTimer = null;
   function cargoSay(text, audioKey) {
     var r = $('voice-reply');
     r.textContent = text;
     r.classList.remove('hidden');
     $('voice-panel').classList.remove('hidden');
+    var toast = $('voice-toast');
+    toast.textContent = text;
+    toast.classList.remove('hidden');
+    if (voiceToastTimer) clearTimeout(voiceToastTimer);
+    voiceToastTimer = setTimeout(function () { toast.classList.add('hidden'); }, 6000);
     if (audioKey) {
       var a = voiceRepliesAudio[audioKey];
       if (!a) {
