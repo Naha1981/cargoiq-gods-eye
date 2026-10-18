@@ -1301,29 +1301,37 @@
   $('recon-upload').addEventListener('change', function (ev) {
     var files = Array.prototype.slice.call(ev.target.files || []);
     if (RECON.photos.length + files.length > 6) { cargoSay('Keep it to 6 photos for now - the sharpest angles.', null); files = files.slice(0, Math.max(0, 6 - RECON.photos.length)); }
-    files.forEach(function (f) {
-      var reader = new FileReader();
-      reader.onload = function () {
-        var img = reader.result;
-        var done = function (gps, ts) {
-          reconAdd({
-            name: f.name, img: img, ts: ts || null,
-            lat: gps && gps.latitude ? gps.latitude : DISPUTE.lat,
-            lon: gps && gps.longitude ? gps.longitude : DISPUTE.lon,
-            assumed: !(gps && gps.latitude)
-          });
-        };
-        if (window.exifr) {
-          window.exifr.parse(f, { gps: true, pick: ['DateTimeOriginal'] }).then(function (meta) {
-            var gps = meta && meta.latitude != null ? meta : null;
-            var ts = meta && meta.DateTimeOriginal ? Math.floor(new Date(meta.DateTimeOriginal).getTime() / 1000) : null;
-            done(gps, ts);
-          }).catch(function () { done(null, null); });
-        } else { done(null, null); }
-      };
-      reader.readAsDataURL(f);
-    });
+    files.forEach(reconIngestFile);
     ev.target.value = '';
+  });
+  function reconIngestFile(f) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = reader.result;
+      var done = function (gps, ts) {
+        reconAdd({
+          name: f.name, img: img, ts: ts || null,
+          lat: gps && gps.latitude ? gps.latitude : DISPUTE.lat,
+          lon: gps && gps.longitude ? gps.longitude : DISPUTE.lon,
+          assumed: !(gps && gps.latitude)
+        });
+      };
+      if (window.exifr) {
+        window.exifr.parse(f, { gps: true, pick: ['DateTimeOriginal'] }).then(function (meta) {
+          var gps = meta && meta.latitude != null ? meta : null;
+          var ts = meta && meta.DateTimeOriginal ? Math.floor(new Date(meta.DateTimeOriginal).getTime() / 1000) : null;
+          done(gps, ts);
+        }).catch(function () { done(null, null); });
+      } else { done(null, null); }
+    };
+    reader.readAsDataURL(f);
+  }
+  $('recon-samples').addEventListener('click', function () {
+    ['sample-quayside.jpg', 'sample-gate.jpg', 'sample-yard.jpg'].forEach(function (name) {
+      fetch('data/recon/' + name).then(function (r) { return r.blob(); }).then(function (b) {
+        reconIngestFile(new File([b], name, { type: 'image/jpeg' }));
+      }).catch(function () {});
+    });
   });
   $('recon-clear').addEventListener('click', function () {
     RECON.photos = [];
@@ -1420,6 +1428,19 @@
   if (qs.get('risk') === '1') { $('risk-btn').click(); }
   if (qs.get('recon') === '1') { $('recon-btn').click(); }
   if (qs.get('fp') === '1') { setTimeout(fpStart, 2500); }
+  if (qs.get('mic') === 'start') { setTimeout(function () { $('voice-btn').click(); }, 2500); }
+  if (qs.get('t')) {
+    setTimeout(function () {
+      var t = parseInt(qs.get('t'), 10);
+      if (!t) return;
+      if ($('scrub-bar').classList.contains('hidden')) $('scrub-chip').click();
+      var v = Math.round((t - NOW_MIN) / 900);
+      slider.value = Math.max(0, Math.min(384, v));
+      loadScrubWeather();
+      applyScrub(NOW_MIN + parseInt(slider.value, 10) * 900);
+    }, 2500);
+  }
+  if (qs.get('samples') === '1') { setTimeout(function () { $('recon-btn').click(); $('recon-samples').click(); }, 2500); }
   if (qs.get('say')) { setTimeout(function () { handleVoiceCommand(qs.get('say')); }, 3000); }
 
   // ---------- start ----------
