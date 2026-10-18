@@ -1,6 +1,6 @@
 # CargoIQ Live Harbour View (Phase 0 proof)
 
-Standalone proof page for the CargoIQ "God's Eye View" concept: live vessels around
+Standalone proof page for a live harbour picture: vessels around
 Durban and Richards Bay on a satellite globe, one fictional disputed container pinned
 (case DUR-2026-0412), fly-to views. Separate from the production CargoIQ app.
 

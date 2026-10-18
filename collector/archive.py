@@ -5,7 +5,7 @@ NOW = time.time()
 UTC = time.gmtime()
 
 def fetch(url, timeout=30, binary=False):
-    req = urllib.request.Request(url, headers={"User-Agent": "NahaLabs-GodsEye/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "NahaLabs-LiveHarbourView/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read() if binary else r.read().decode()
 
