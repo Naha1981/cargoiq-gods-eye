@@ -1165,6 +1165,20 @@
       }
       y += 6;
       doc.text('Live replay: https://nahalabs.co.za/harbour-view/?case=' + CASE.id + '&replay=1', 14, y);
+      if (tray.length) {
+        doc.addPage();
+        doc.setFontSize(14); doc.text('Sealed map evidence (' + tray.length + ')', 14, 18);
+        var ay = 26;
+        tray.forEach(function (it, i) {
+          if (ay > 210) { doc.addPage(); ay = 20; }
+          doc.setFontSize(11); doc.text((i + 1) + '. ' + it.label, 14, ay); ay += 5;
+          doc.setFontSize(9);
+          doc.text('Sealed ' + fmtSAST(it.sealedAt) + ' SAST - view as of ' + fmtSAST(it.shownTime) + ' SAST', 14, ay); ay += 4.5;
+          if (it.img) { try { doc.addImage(it.img, 'JPEG', 14, ay, 120, Math.round(120 * 0.66)); ay += Math.round(120 * 0.66) + 4; } catch (e) {} }
+          var sl = doc.splitTextToSize('Source: ' + it.source + '. Limits: ' + it.limits, 175);
+          doc.text(sl, 14, ay); ay += sl.length * 4.2 + 6;
+        });
+      }
       doc.save(CASE.id + '-evidence-pack.pdf');
       cargoSay('Evidence pack PDF downloaded for case ' + CASE.id + '.', null);
     } catch (e) {
@@ -1537,6 +1551,75 @@
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
   }
 
+
+  // ---------- evidence sealing: every map view can land in the pack ----------
+  var TRAY_KEY = 'gev-evidence-tray-v1';
+  var tray = [];
+  try { tray = JSON.parse(localStorage.getItem(TRAY_KEY) || '[]'); } catch (e) { tray = []; }
+  function saveTray() { try { localStorage.setItem(TRAY_KEY, JSON.stringify(tray)); } catch (e) { /* quota - oldest dropped */
+      while (tray.length > 1) { tray.shift(); try { localStorage.setItem(TRAY_KEY, JSON.stringify(tray)); break; } catch (e2) {} }
+    } }
+  function traySubject() {
+    if (!$('ev-card').classList.contains('hidden')) return { label: $('ev-title').textContent, source: 'Case evidence file. Sample data. Fictional records.', limits: 'Historical record as filed; not independently verified.' };
+    if (!$('cam-panel').classList.contains('hidden')) return { label: 'Camera: ' + $('cam-title').textContent, source: $('cam-source').textContent, limits: 'Public webcam still frame; camera position approximate; refresh cadence not guaranteed.' };
+    if (!$('dispute-card').classList.contains('hidden')) return { label: 'Disputed container DUR-2026-0412', source: 'Case file. Sample data. Fictional records.', limits: 'Fictional sample case for demonstration.' };
+    if (selectedMmsi && vessels.get(selectedMmsi)) {
+      var v = vessels.get(selectedMmsi);
+      return { label: 'Vessel ' + (v.rec.name || ('MMSI ' + selectedMmsi)) + (v.fromSnapshot ? ' (snapshot)' : ' (live)'), source: v.fromSnapshot ? 'AISStream snapshot via NahaLabs relay' : 'Live AIS via AISStream + NahaLabs relay', limits: 'AIS self-reported position; one moment in time; not a certified survey.' };
+    }
+    return { label: 'Harbour view', source: 'Esri World Imagery + AIS (AISStream via NahaLabs relay)', limits: 'Map view at one moment; vessel positions self-reported.' };
+  }
+  function captureMapImage() {
+    if (LITE) return null;
+    try {
+      scene.render();
+      var src = viewer.canvas;
+      var w = 640, h = Math.round(src.height * (640 / src.width));
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(src, 0, 0, w, h);
+      return cv.toDataURL('image/jpeg', 0.62);
+    } catch (e) { return null; }
+  }
+  function sealEvidence() {
+    var subj = traySubject();
+    var t = (SCRUB.active && SCRUB.t) ? SCRUB.t : Math.floor(Date.now() / 1000);
+    var img = captureMapImage();
+    var item = {
+      sealedAt: Math.floor(Date.now() / 1000),
+      shownTime: t,
+      label: subj.label,
+      source: subj.source,
+      limits: subj.limits + (img ? '' : ' Map image unavailable in this mode; text record sealed.'),
+      img: img
+    };
+    tray.push(item);
+    if (tray.length > 20) tray.shift();
+    saveTray(); renderTray();
+    cargoSay('Sealed into the evidence pack: ' + subj.label + ', ' + fmtSAST(t) + ' SAST.', null);
+  }
+  function renderTray() {
+    $('ev-count').textContent = tray.length;
+    var list = $('ev-tray-list');
+    list.innerHTML = '';
+    if (!tray.length) { list.innerHTML = '<p class="purpose">Nothing sealed yet. Frame the view that matters and tap ADD TO EVIDENCE.</p>'; return; }
+    tray.forEach(function (it, idx) {
+      var row = document.createElement('div');
+      row.className = 'ev-item';
+      row.innerHTML = (it.img ? '<img src="' + it.img + '" alt="">' : '<div class="ev-noimg">text record</div>') +
+        '<div class="ev-meta"><b>' + esc(it.label) + '</b><br>' + fmtSAST(it.shownTime) + ' SAST' +
+        '<span class="ev-src">Source: ' + esc(it.source) + '<br>Limits: ' + esc(it.limits) + '</span></div>';
+      var del = document.createElement('button');
+      del.className = 'mini-btn'; del.textContent = 'Remove';
+      del.addEventListener('click', function () { tray.splice(idx, 1); saveTray(); renderTray(); });
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
+  $('ev-add').addEventListener('click', sealEvidence);
+  $('ev-tray-btn').addEventListener('click', function () { renderTray(); $('ev-tray').classList.toggle('hidden'); });
+  $('ev-tray-close').addEventListener('click', function () { $('ev-tray').classList.add('hidden'); });
+  renderTray();
+
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);
   var wantVessel = qs.get('vessel');
@@ -1573,6 +1656,8 @@
       else if (tries0 > 20) clearInterval(peekPoll);
     }, 500);
   }
+  if (qs.get('seal')) { setTimeout(sealEvidence, 2500); }
+  if (qs.get('tray')) { setTimeout(function () { $('ev-tray-btn').click(); }, 3200); }
   if (qs.get('micerror')) { setTimeout(function () { $('voice-panel').classList.remove('hidden'); voiceError(qs.get('micerror')); }, 2500); }
   if (qs.get('t')) {
     setTimeout(function () {
