@@ -566,6 +566,7 @@
     toast.classList.remove('hidden');
     if (voiceToastTimer) clearTimeout(voiceToastTimer);
     voiceToastTimer = setTimeout(function () { toast.classList.add('hidden'); }, 6000);
+    if (audioKey) setTimeout(function () { $('voice-panel').classList.add('hidden'); }, 1400);
     if (audioKey) {
       var a = voiceRepliesAudio[audioKey];
       if (!a) {
