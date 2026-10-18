@@ -27,8 +27,19 @@
     statusText.textContent = text;
   }
 
+  var LITE = new URLSearchParams(location.search).get('lite') === '1';
   var viewer;
+  if (LITE) {
+    var noopCanvas = document.createElement('canvas');
+    viewer = {
+      entities: { add: function () { return { position: null, point: {}, label: {} }; }, remove: function () {} },
+      camera: { flyTo: function () {}, setView: function () {} },
+      scene: { canvas: noopCanvas, pick: function () { return undefined; }, skyAtmosphere: null },
+      trackedEntity: null, resolutionScale: 1
+    };
+  }
   try {
+    if (LITE) throw 'lite';
     if (window.Cesium && Cesium.Ion) { Cesium.Ion.defaultAccessToken = ''; }
     var imagery = new Cesium.UrlTemplateImageryProvider({
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -52,12 +63,11 @@
       maximumRenderTimeChange: Infinity
     });
   } catch (e) {
-    $('fatal').classList.remove('hidden');
-    return;
+    if (LITE) { $('cesiumContainer').style.background = '#0b1220'; } else { $('fatal').classList.remove('hidden'); return; }
   }
 
   // Keyless terrain (progressive enhancement; flat ellipsoid if it fails)
-  Cesium.CesiumTerrainProvider.fromUrl('https://terrain.reearth.land/cesium-mesh/ellipsoid', {
+  if (!LITE) Cesium.CesiumTerrainProvider.fromUrl('https://terrain.reearth.land/cesium-mesh/ellipsoid', {
     requestVertexNormals: false,
     credit: 'Re:Earth Terrain'
   }).then(function (tp) {
