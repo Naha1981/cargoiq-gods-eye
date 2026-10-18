@@ -700,7 +700,28 @@
       }
       a.currentTime = 0;
       a.play().catch(function () { /* audio not bundled yet or autoplay blocked - text reply stands */ });
+    } else {
+      dynamicSay(text);
     }
+  }
+  var TTS_URL = 'https://cargoiq-gods-eye.onrender.com/tts';
+  var ttsAudioCache = {};
+  function dynamicSay(text) {
+    if (!text || text.length > 480) return;
+    var cached = ttsAudioCache[text];
+    if (cached) { cached.currentTime = 0; cached.play().catch(function () {}); return; }
+    fetch(TTS_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('tts ' + r.status);
+      return r.blob();
+    }).then(function (b) {
+      var a = new Audio(URL.createObjectURL(b));
+      ttsAudioCache[text] = a;
+      a.play().catch(function () { /* autoplay blocked - text reply stands */ });
+    }).catch(function () { /* text reply stands */ });
   }
   function cargoHeard(text) {
     var h = $('voice-heard');
@@ -759,7 +780,7 @@
         showVessel(hit.mmsi);
         flyToPoint(vessels.get(hit.mmsi).rec.lon, vessels.get(hit.mmsi).rec.lat, 15000);
         resolved = 'track:' + (vessels.get(hit.mmsi).rec.name || hit.mmsi) + ' score ' + hit.score;
-        cargoSay('Tracking ' + (vessels.get(hit.mmsi).rec.name || ('MMSI ' + hit.mmsi)) + '.', 'track');
+        cargoSay('Tracking ' + (vessels.get(hit.mmsi).rec.name || ('MMSI ' + hit.mmsi)) + '.', null);
       } else {
         resolved = 'miss:vessel:' + name;
         cargoSay('I could not find that vessel in the current feed. Try its name as shown on the map.', 'missvessel');
