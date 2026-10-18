@@ -624,19 +624,19 @@
   var VOICE_PLACES = [
     { key: 'durban', names: ['durban', 'derban', 'durbun', 'ethekwini', 'ethekweni', 'tekwini'], view: 'durban', reply: 'Flying to Durban harbour.', audio: 'durban' },
     { key: 'richards', names: ['richards bay', 'richards', 'richard bay', 'richards bae', 'richardspay'], view: 'richards', reply: 'Flying to Richards Bay. Note: terrestrial A I S coverage there is currently zero. A known dead zone.', audio: 'richards' },
-    { key: 'capetown', names: ['cape town', 'capetown', 'kaapstad'], lon: 18.43, lat: -33.91, alt: 55000, reply: 'Cape Town is outside the current evidence coverage. Durban and Richards Bay are instrumented.' },
-    { key: 'gqeberha', names: ['gqeberha', 'port elizabeth', 'qeberha', 'gheberha', 'geberha'], lon: 25.63, lat: -33.97, alt: 55000, reply: 'Gqeberha, Port Elizabeth, is outside the current evidence coverage.' },
-    { key: 'coega', names: ['coega', 'ngqura', 'kuga', 'incura'], lon: 25.69, lat: -33.79, alt: 40000, reply: 'Coega, Ngqura, is outside the current evidence coverage.' },
-    { key: 'eastlondon', names: ['east london', 'buffalo city'], lon: 27.91, lat: -33.02, alt: 40000, reply: 'East London is outside the current evidence coverage.' },
-    { key: 'saldanha', names: ['saldanha', 'saldana'], lon: 17.95, lat: -33.02, alt: 40000, reply: 'Saldanha is outside the current evidence coverage.' },
-    { key: 'mosselbay', names: ['mossel bay', 'mosel bay'], lon: 22.13, lat: -34.18, alt: 40000, reply: 'Mossel Bay is outside the current evidence coverage.' }
+    { key: 'capetown', audio: 'place-capetown', names: ['cape town', 'capetown', 'kaapstad'], lon: 18.43, lat: -33.91, alt: 55000, reply: 'Cape Town is outside the current evidence coverage. Durban and Richards Bay are instrumented.' },
+    { key: 'gqeberha', audio: 'place-gqeberha', names: ['gqeberha', 'port elizabeth', 'qeberha', 'gheberha', 'geberha'], lon: 25.63, lat: -33.97, alt: 55000, reply: 'Gqeberha, Port Elizabeth, is outside the current evidence coverage.' },
+    { key: 'coega', audio: 'place-coega', names: ['coega', 'ngqura', 'kuga', 'incura'], lon: 25.69, lat: -33.79, alt: 40000, reply: 'Coega, Ngqura, is outside the current evidence coverage.' },
+    { key: 'eastlondon', audio: 'place-eastlondon', names: ['east london', 'buffalo city'], lon: 27.91, lat: -33.02, alt: 40000, reply: 'East London is outside the current evidence coverage.' },
+    { key: 'saldanha', audio: 'place-saldanha', names: ['saldanha', 'saldana'], lon: 17.95, lat: -33.02, alt: 40000, reply: 'Saldanha is outside the current evidence coverage.' },
+    { key: 'mosselbay', audio: 'place-mosselbay', names: ['mossel bay', 'mosel bay'], lon: 22.13, lat: -34.18, alt: 40000, reply: 'Mossel Bay is outside the current evidence coverage.' }
   ];
   var VOICE_TERMINALS = [
-    { key: 'dgt', names: ['dgt', 'berth 108', 'berth one zero eight', 'durban general', 'container terminal', 'dct'], lon: 31.0395, lat: -29.8698, alt: 8000, reply: 'Flying to the Durban container terminal area, where the disputed container is held.' },
-    { key: 'bayhead', names: ['bayhead', 'bay head'], lon: 31.031, lat: -29.871, alt: 10000, reply: 'Flying to Bayhead.' },
-    { key: 'point', names: ['the point', 'point terminal', 'point waterfront'], lon: 31.041, lat: -29.856, alt: 10000, reply: 'Flying to the Point area.' },
-    { key: 'maydon', names: ['maydon wharf', 'madonna wharf', 'maiden wharf'], lon: 31.018, lat: -29.885, alt: 10000, reply: 'Flying to Maydon Wharf.' },
-    { key: 'islandview', names: ['island view', 'islandview'], lon: 31.005, lat: -29.878, alt: 10000, reply: 'Flying to Island View.' }
+    { key: 'dgt', audio: 'term-dgt', names: ['dgt', 'berth 108', 'berth one zero eight', 'durban general', 'container terminal', 'dct'], lon: 31.0395, lat: -29.8698, alt: 8000, reply: 'Flying to the Durban container terminal area, where the disputed container is held.' },
+    { key: 'bayhead', audio: 'term-bayhead', names: ['bayhead', 'bay head'], lon: 31.031, lat: -29.871, alt: 10000, reply: 'Flying to Bayhead.' },
+    { key: 'point', audio: 'term-point', names: ['the point', 'point terminal', 'point waterfront'], lon: 31.041, lat: -29.856, alt: 10000, reply: 'Flying to the Point area.' },
+    { key: 'maydon', audio: 'term-maydon', names: ['maydon wharf', 'madonna wharf', 'maiden wharf'], lon: 31.018, lat: -29.885, alt: 10000, reply: 'Flying to Maydon Wharf.' },
+    { key: 'islandview', audio: 'term-islandview', names: ['island view', 'islandview'], lon: 31.005, lat: -29.878, alt: 10000, reply: 'Flying to Island View.' }
   ];
   var VOICE_DISPUTE_WORDS = ['dispute', 'disputed', 'container', 'msku', 'musku', 'umhlanga', 'umshlanga', 'the case', 'our case'];
   function logVoiceMiss(heard, resolved) {
@@ -762,7 +762,7 @@
         cargoSay('Tracking ' + (vessels.get(hit.mmsi).rec.name || ('MMSI ' + hit.mmsi)) + '.', 'track');
       } else {
         resolved = 'miss:vessel:' + name;
-        cargoSay('I could not find that vessel in the current feed. Try its name as shown on the map.', null);
+        cargoSay('I could not find that vessel in the current feed. Try its name as shown on the map.', 'missvessel');
       }
     } else if (caseIntent(t)) {
       openCase(); resolved = 'case:' + CASE.id;
@@ -787,9 +787,9 @@
       if (!placed) {
         if (/help|what can you/.test(t)) {
           resolved = 'help';
-          cargoSay('Try: show Durban, show the disputed container, track a vessel name, nearest camera, port conditions, replay the case, or stop.', null);
+          cargoSay('Try: show Durban, show the disputed container, track a vessel name, nearest camera, port conditions, replay the case, or stop.', 'help');
         } else {
-          cargoSay('I did not catch a command. Tap "What you can say" for examples.', null);
+          cargoSay('I did not catch a command. Tap "What you can say" for examples.', 'miss');
         }
       }
     }
