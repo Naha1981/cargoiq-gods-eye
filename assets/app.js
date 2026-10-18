@@ -67,10 +67,21 @@
   if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = !isMobile;
   if (isMobile) {
     viewer.resolutionScale = 0.8;
+    var noteShown = false;
     setTimeout(function () {
+      if (noteShown) return;
+      if (document.querySelector('.card:not(.hidden), #scrub-bar:not(.hidden), #fp-hud:not(.hidden)')) return; // never overlap a panel
+      noteShown = true;
       $('desktop-note').classList.remove('hidden');
       setTimeout(function () { $('desktop-note').classList.add('hidden'); }, 9000);
     }, 2500);
+    // dismiss permanently as soon as any panel/card opens
+    new MutationObserver(function () {
+      if (document.querySelector('.card:not(.hidden), #scrub-bar:not(.hidden), #fp-hud:not(.hidden)')) {
+        noteShown = true;
+        $('desktop-note').classList.add('hidden');
+      }
+    }).observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
   }
   $('desktop-note-ok').addEventListener('click', function () { $('desktop-note').classList.add('hidden'); });
   viewer.scene.globe.enableLighting = false;
