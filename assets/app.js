@@ -34,8 +34,13 @@
     viewer = {
       entities: { add: function () { return { position: null, point: {}, label: {} }; }, remove: function () {} },
       camera: { flyTo: function () {}, setView: function () {} },
-      scene: { canvas: noopCanvas, pick: function () { return undefined; }, skyAtmosphere: null },
-      trackedEntity: null, resolutionScale: 1
+      scene: {
+        canvas: noopCanvas, pick: function () { return undefined; }, skyAtmosphere: null,
+        globe: {}, screenSpaceCameraController: {}, primitives: {},
+        requestRender: function () {}, isDestroyed: function () { return false; }
+      },
+      trackedEntity: null, resolutionScale: 1, terrainProvider: null,
+      isDestroyed: function () { return false; }
     };
   }
   try {
