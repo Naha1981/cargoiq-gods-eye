@@ -362,3 +362,8 @@ body {
 #scrub-bar .win-band, .win-band { background: rgba(220,38,38,0.14); border-color: rgba(220,38,38,0.45); }
 #fp-hud .win-prefix, .win-prefix { color: #b3261e; }
 .cam-frame { background: #e8e5de; }
+
+/* purpose line as a readable chip over the map (design bar) */
+.purpose-line { background: rgba(255,255,255,0.92); border: 1px solid var(--line); border-radius: 10px; padding: 5px 9px; margin-top: 5px; font-size: 11px; color: var(--text); }
+.purpose-line b { font-weight: 700; }
+.purpose b { font-weight: 700; }
