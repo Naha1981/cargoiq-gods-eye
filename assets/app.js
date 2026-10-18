@@ -1194,6 +1194,156 @@
   });
   $('risk-close').addEventListener('click', function () { $('risk-panel').classList.add('hidden'); });
 
+
+  // ---------- item 7: incident reconstruction + NTSB first-person replay ----------
+  var RECON = { photos: [], entities: [] };
+  function reconSave() {
+    try {
+      var slim = RECON.photos.map(function (p) { return { name: p.name, ts: p.ts, lat: p.lat, lon: p.lon, assumed: p.assumed, img: p.img }; });
+      var json = JSON.stringify(slim);
+      if (json.length < 2500000) localStorage.setItem('gev-recon', json);
+    } catch (e) {}
+  }
+  function reconRender() {
+    var list = $('recon-list');
+    list.innerHTML = '';
+    RECON.photos.forEach(function (p, i) {
+      var row = document.createElement('div');
+      row.className = 'recon-photo';
+      row.innerHTML = '<img src="' + p.img + '" alt=""><div class="meta"><div class="t">' + (p.ts ? fmtSAST(p.ts) + ' SAST' : 'no timestamp') + '</div><div>' + (p.assumed ? 'Position assumed - berth' : 'GPS-pinned') + '</div><div>' + p.name + '</div></div>';
+      row.addEventListener('click', function () { flyToPoint(p.lon, p.lat, 3500); });
+      list.appendChild(row);
+    });
+  }
+  function reconPin(p) {
+    var ent = viewer.entities.add({
+      position: new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 30)),
+      point: {
+        pixelSize: 9,
+        color: Cesium.Color.fromCssColorString('#a78bfa'),
+        outlineColor: Cesium.Color.WHITE, outlineWidth: 1.5,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      label: {
+        text: 'PHOTO', font: 'bold 9px sans-serif',
+        fillColor: Cesium.Color.fromCssColorString('#c4b5fd'),
+        outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(0, -17),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 60000),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      polyline: {
+        positions: [Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 30), Cesium.Cartesian3.fromDegrees(DISPUTE.lon, DISPUTE.lat, 30)],
+        width: 1.5,
+        material: new Cesium.PolylineDashMaterialProperty({ color: Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.6) })
+      }
+    });
+    RECON.entities.push(ent);
+  }
+  function reconAdd(p) {
+    RECON.photos.push(p);
+    reconPin(p);
+    reconRender();
+    reconSave();
+  }
+  $('recon-upload').addEventListener('change', function (ev) {
+    var files = Array.prototype.slice.call(ev.target.files || []);
+    if (RECON.photos.length + files.length > 6) { cargoSay('Keep it to 6 photos for now - the sharpest angles.', null); files = files.slice(0, Math.max(0, 6 - RECON.photos.length)); }
+    files.forEach(function (f) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = reader.result;
+        var done = function (gps, ts) {
+          reconAdd({
+            name: f.name, img: img, ts: ts || null,
+            lat: gps && gps.latitude ? gps.latitude : DISPUTE.lat,
+            lon: gps && gps.longitude ? gps.longitude : DISPUTE.lon,
+            assumed: !(gps && gps.latitude)
+          });
+        };
+        if (window.exifr) {
+          window.exifr.parse(f, { gps: true, pick: ['DateTimeOriginal'] }).then(function (meta) {
+            var gps = meta && meta.latitude != null ? meta : null;
+            var ts = meta && meta.DateTimeOriginal ? Math.floor(new Date(meta.DateTimeOriginal).getTime() / 1000) : null;
+            done(gps, ts);
+          }).catch(function () { done(null, null); });
+        } else { done(null, null); }
+      };
+      reader.readAsDataURL(f);
+    });
+    ev.target.value = '';
+  });
+  $('recon-clear').addEventListener('click', function () {
+    RECON.photos = [];
+    RECON.entities.forEach(function (e) { viewer.entities.remove(e); });
+    RECON.entities = [];
+    reconRender(); reconSave();
+  });
+  $('recon-btn').addEventListener('click', function () { $('recon-panel').classList.toggle('hidden'); });
+  $('recon-close').addEventListener('click', function () { $('recon-panel').classList.add('hidden'); });
+  try {
+    var saved = JSON.parse(localStorage.getItem('gev-recon') || '[]');
+    saved.forEach(function (p) { RECON.photos.push(p); reconPin(p); });
+    reconRender();
+  } catch (e) {}
+
+  // NTSB-style first-person replay: vantage camera + synced narration + telemetry HUD
+  var FP = { timer: null, idx: -1, audio: null };
+  var FP_STEPS = [
+    { ts: 1792210320, step: '1/4 - Arrival, outer anchorage', cap: 'Day one, 06:12. MV Umhlanga Trader holds at the outer anchorage, 11 km off Durban. The dispute clock starts here.',
+      eye: { lon: 31.19, lat: -29.80, alt: 400 }, look: { lon: 31.175, lat: -29.795 }, audio: 'ntsb1' },
+    { ts: 1792240800, step: '2/4 - Berthing, DGT berth 108', cap: 'Day one, 14:40. The vessel berths. The terminal log says the berth was ready at 12:00. The carrier log disagrees.',
+      eye: { lon: 31.050, lat: -29.861, alt: 120 }, look: { lon: 31.0393, lat: -29.8702 }, audio: 'ntsb2' },
+    { ts: 1792253100, step: '3/4 - Free-time expiry', cap: 'Day one, 18:05. Free time expires on MSKU 482931 7. Two clocks. Two stories.',
+      eye: { lon: 31.0435, lat: -29.8660, alt: 80 }, look: { lon: 31.0395, lat: -29.8698 }, audio: 'ntsb3' },
+    { ts: 1792307700, step: '4/4 - Invoice issued', cap: 'Day two, 09:15. The demurrage invoice is issued. Two contradictions remain open. This is where the evidence decides.',
+      eye: { lon: 31.0435, lat: -29.8660, alt: 80 }, look: { lon: 31.0395, lat: -29.8698 }, audio: 'ntsb4' }
+  ];
+  function fpStep() {
+    if (FP.idx >= FP_STEPS.length) { fpStop(); return; }
+    var st = FP_STEPS[FP.idx];
+    var heading = Cesium.Math.toRadians(Cesium.Math.toDegrees(Math.atan2(st.look.lon - st.eye.lon, st.look.lat - st.eye.lat)));
+    viewer.trackedEntity = undefined;
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(st.eye.lon, st.eye.lat, st.eye.alt),
+      orientation: { heading: heading, pitch: Cesium.Math.toRadians(-12), roll: 0 }
+    });
+    var tele = '';
+    if (SCRUB.wx && SCRUB.wx.time) {
+      var wi = nearestHourly(SCRUB.wx, st.ts);
+      var mi = SCRUB.marine && SCRUB.marine.time ? nearestHourly(SCRUB.marine, st.ts) : null;
+      if (wi !== null) {
+        tele = 'wind ' + Math.round(SCRUB.wx.wind_speed_10m[wi]) + ' kn gusting ' + Math.round(SCRUB.wx.wind_gusts_10m[wi]) + ' kn';
+        if (mi !== null && SCRUB.marine.wave_height[mi] != null) tele += ' | waves ' + SCRUB.marine.wave_height[mi] + ' m';
+        tele += ' (Open-Meteo archive)';
+      }
+    }
+    $('fp-step').textContent = st.step + ' - ' + fmtSAST(st.ts) + ' SAST';
+    $('fp-tele').textContent = tele;
+    $('fp-cap').textContent = st.cap;
+    $('fp-hud').classList.remove('hidden');
+    if (FP.audio) { try { FP.audio.pause(); } catch (e) {} }
+    FP.audio = new Audio('assets/voice/' + st.audio + '.mp3');
+    FP.audio.play().catch(function () {});
+    FP.idx++;
+    FP.timer = setTimeout(fpStep, 9500);
+  }
+  function fpStart() {
+    fpStop();
+    loadScrubWeather();
+    FP.idx = 0;
+    setTimeout(fpStep, 400);
+  }
+  function fpStop() {
+    if (FP.timer) { clearTimeout(FP.timer); FP.timer = null; }
+    if (FP.audio) { try { FP.audio.pause(); } catch (e) {} FP.audio = null; }
+    FP.idx = -1;
+    $('fp-hud').classList.add('hidden');
+  }
+  $('recon-fp').addEventListener('click', function () { $('recon-panel').classList.add('hidden'); fpStart(); });
+  $('fp-stop').addEventListener('click', fpStop);
+
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);
   var wantVessel = qs.get('vessel');
@@ -1217,6 +1367,8 @@
   if (qs.get('scrub') === '1') { $('scrub-chip').click(); }
   if (qs.get('case')) { setTimeout(openCase, 2200); }
   if (qs.get('risk') === '1') { $('risk-btn').click(); }
+  if (qs.get('recon') === '1') { $('recon-btn').click(); }
+  if (qs.get('fp') === '1') { setTimeout(fpStart, 2500); }
   if (qs.get('say')) { setTimeout(function () { handleVoiceCommand(qs.get('say')); }, 3000); }
 
   // ---------- start ----------

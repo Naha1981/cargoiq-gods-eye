@@ -14,6 +14,7 @@
 <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/';</script>
 <script src="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Cesium.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.min.js"></script>
 </head>
 <body>
 <div id="cesiumContainer"></div>
@@ -25,7 +26,7 @@
   <div id="scrub-bar" class="hidden">
     <div id="scrub-readout">Live - now</div>
     <input id="scrub-slider" type="range" min="0" max="384" value="192" step="1">
-    <div id="scrub-track"><div id="scrub-window"><span>DISPUTE WINDOW</span></div></div>
+    <div id="scrub-track"><div id="scrub-window"><span>Disputed window</span></div></div>
     <div id="scrub-ends"><span id="scrub-min"></span><span id="scrub-max"></span></div>
   </div>
 
@@ -52,6 +53,24 @@
     <img id="ev-img" class="cam-frame hidden" alt="evidence frame">
     <p id="ev-desc" class="replay-desc"></p>
     <div class="fine">Sample data. Fictional records.</div>
+  </div>
+  <section id="recon-panel" class="card hidden">
+    <button id="recon-close" class="card-close" aria-label="Close">&times;</button>
+    <h3>Incident reconstruction <span class="dispute-badge">DISPUTED</span></h3>
+    <p class="card-source">Drop photos from the scene. GPS-tagged photos pin to their exact spot; others pin to the berth (assumed, labelled).</p>
+    <input type="file" id="recon-upload" accept="image/*" multiple style="margin-top:8px; font-size:12px;">
+    <div id="recon-list"></div>
+    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+      <button id="recon-fp" class="mini-btn">First-person replay (NTSB)</button>
+      <button id="recon-clear" class="mini-btn">Clear photos</button>
+    </div>
+    <div class="fine">Reconstruction workspace. Sample case. Photos stay in this browser.</div>
+  </section>
+  <div id="fp-hud" class="hidden">
+    <button id="fp-stop" class="card-close" aria-label="Stop">&times;</button>
+    <div id="fp-step"></div>
+    <div id="fp-tele"></div>
+    <div id="fp-cap"></div>
   </div>
   <div id="voice-toast" class="hidden"></div>
   <div id="voice-panel" class="card hidden">
@@ -106,6 +125,7 @@
 </section>
 
 <button id="cond-btn" class="cond-chip" aria-label="Port conditions">CONDITIONS</button>
+  <button id="recon-btn" class="cond-chip" aria-label="Incident reconstruction">RECONSTRUCT</button>
   <button id="risk-btn" class="cond-chip" style="right: 14px; top: calc(158px + env(safe-area-inset-top));">BERTH RISK</button>
   <section id="risk-panel" class="card hidden">
     <button id="risk-close" class="card-close" aria-label="Close">&times;</button>
