@@ -1444,6 +1444,7 @@
   if (qs.get('recon') === '1') { $('recon-btn').click(); }
   if (qs.get('fp') === '1') { setTimeout(fpStart, 2500); }
   if (qs.get('mic') === 'start') { setTimeout(function () { $('voice-btn').click(); }, 2500); }
+  if (qs.get('micerror')) { setTimeout(function () { $('voice-panel').classList.remove('hidden'); voiceError(qs.get('micerror')); }, 2500); }
   if (qs.get('t')) {
     setTimeout(function () {
       var t = parseInt(qs.get('t'), 10);
