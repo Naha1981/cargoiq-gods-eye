@@ -16,6 +16,31 @@
 </head>
 <body>
 <div id="cesiumContainer"></div>
+  <button id="voice-btn" aria-label="Voice commands">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
+  </button>
+  <div id="voice-panel" class="card hidden">
+    <button id="voice-close" class="close-x" aria-label="Close">&times;</button>
+    <h3>Talk to CargoIQ</h3>
+    <div id="voice-status">Hold the mic and speak, or type below.</div>
+    <div id="voice-heard" class="voice-line hidden"></div>
+    <div id="voice-reply" class="voice-line hidden"></div>
+    <div id="voice-input-row">
+      <input id="voice-text" type="text" placeholder='Try "show the disputed container"' autocomplete="off">
+      <button id="voice-send">Send</button>
+    </div>
+    <details id="voice-help"><summary>What you can say</summary>
+      <ul>
+        <li>"Show Durban" / "Fly to Richards Bay"</li>
+        <li>"Show the disputed container"</li>
+        <li>"Track MSC Grenada"</li>
+        <li>"Show the nearest camera"</li>
+        <li>"Port conditions"</li>
+        <li>"Replay the case"</li>
+        <li>"Stop"</li>
+      </ul>
+    </details>
+  </div>
 
 <header id="hud-top">
   <div class="brand">

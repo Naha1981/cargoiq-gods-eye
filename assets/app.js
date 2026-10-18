@@ -553,6 +553,131 @@
   });
   $('replay-close').addEventListener('click', stopReplay);
 
+
+  // ---------- voice commands (push-to-talk + typed fallback) ----------
+  var voiceRepliesAudio = {};
+  function cargoSay(text, audioKey) {
+    var r = $('voice-reply');
+    r.textContent = text;
+    r.classList.remove('hidden');
+    $('voice-panel').classList.remove('hidden');
+    if (audioKey) {
+      var a = voiceRepliesAudio[audioKey];
+      if (!a) {
+        a = new Audio('assets/voice/' + audioKey + '.mp3');
+        voiceRepliesAudio[audioKey] = a;
+      }
+      a.currentTime = 0;
+      a.play().catch(function () { /* audio not bundled yet or autoplay blocked - text reply stands */ });
+    }
+  }
+  function cargoHeard(text) {
+    var h = $('voice-heard');
+    h.textContent = text;
+    h.classList.remove('hidden');
+    $('voice-panel').classList.remove('hidden');
+  }
+  function findVesselByName(name) {
+    var needle = name.toLowerCase().trim();
+    var best = null;
+    vessels.forEach(function (v, mmsi) {
+      var vn = (v.rec && v.rec.name ? v.rec.name : '').toLowerCase();
+      if (!vn) return;
+      if (vn === needle) { best = mmsi; return; }
+      if (!best && (vn.indexOf(needle) >= 0 || needle.indexOf(vn) >= 0)) best = mmsi;
+    });
+    return best;
+  }
+  function handleVoiceCommand(raw) {
+    var t = (raw || '').toLowerCase().trim();
+    if (!t) return;
+    cargoHeard(raw);
+    if (/\bstop\b|\bcancel\b/.test(t)) {
+      stopReplay(); stopTrack();
+      cargoSay('Stopped. The harbour is yours.', 'stop');
+    } else if (/richards/.test(t)) {
+      flyTo('richards');
+      cargoSay('Flying to Richards Bay. Note: terrestrial AIS coverage there is currently zero - a known dead zone.', 'richards');
+    } else if (/durban/.test(t)) {
+      flyTo('durban');
+      cargoSay('Flying to Durban harbour.', 'durban');
+    } else if (/disput|container|msku|umhlanga/.test(t)) {
+      flyTo('dispute');
+      setTimeout(function () { $('dispute-card').classList.remove('hidden'); $('info-card').classList.add('hidden'); }, 2500);
+      cargoSay('Showing disputed container MSKU 482931 7, held at Durban Container Terminal. Sample data, fictional records.', 'dispute');
+    } else if (/replay|walk me|timeline/.test(t)) {
+      startReplay();
+      cargoSay('Replaying case DUR-2026-0412: arrival, berthing, free-time expiry, invoice.', 'replay');
+    } else if (/condition|weather|wave|wind|swell/.test(t)) {
+      $('cond-panel').classList.remove('hidden');
+      loadConditions();
+      cargoSay('Here are the current port conditions for Durban.', 'conditions');
+    } else if (/camera|cctv|footage|pier/.test(t)) {
+      var c = null;
+      if (selectedMmsi && vessels.get(selectedMmsi)) {
+        var v = vessels.get(selectedMmsi);
+        c = nearestCamTo(v.rec.lon, v.rec.lat);
+      } else {
+        c = nearestCamTo(DISPUTE.lon, DISPUTE.lat);
+      }
+      if (c) { openCam(c); flyToPoint(c.lon, c.lat, 6000); }
+      cargoSay('Opening the nearest live camera. Position approximate.', 'camera');
+    } else if (/track|find|where is|locate|follow/.test(t)) {
+      var name = t.replace(/track|find|where is|locate|follow|the|vessel|ship|please/g, ' ').replace(/\s+/g, ' ').trim();
+      var mmsi = name ? findVesselByName(name) : null;
+      if (mmsi) {
+        showVessel(mmsi);
+        flyToPoint(vessels.get(mmsi).rec.lon, vessels.get(mmsi).rec.lat, 15000);
+        cargoSay('Tracking ' + (vessels.get(mmsi).rec.name || ('MMSI ' + mmsi)) + '.', 'track');
+      } else {
+        cargoSay('I could not find that vessel in the current feed. Try its name as shown on the map.', null);
+      }
+    } else if (/help|what can you/.test(t)) {
+      cargoSay('Try: show Durban, show the disputed container, track a vessel name, nearest camera, port conditions, replay the case, or stop.', null);
+    } else {
+      cargoSay('I did not catch a command. Tap "What you can say" for examples.', null);
+    }
+  }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = null, listening = false;
+  var voiceBtn = $('voice-btn');
+  function setListening(on) {
+    listening = on;
+    voiceBtn.classList.toggle('listening', on);
+    $('voice-status').textContent = on ? 'Listening... speak now.' : 'Hold the mic and speak, or type below.';
+  }
+  if (SR) {
+    rec = new SR();
+    rec.lang = 'en-ZA';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = function (e) {
+      var text = e.results[0][0].transcript;
+      handleVoiceCommand(text);
+    };
+    rec.onend = function () { setListening(false); };
+    rec.onerror = function () { setListening(false); };
+    var startRec = function (ev) {
+      ev.preventDefault();
+      if (listening) { rec.stop(); return; }
+      try { rec.start(); setListening(true); $('voice-panel').classList.remove('hidden'); } catch (err) {}
+    };
+    voiceBtn.addEventListener('click', startRec);
+  } else {
+    voiceBtn.addEventListener('click', function () {
+      $('voice-panel').classList.toggle('hidden');
+      $('voice-status').textContent = 'This browser has no speech recognition - type your command below.';
+    });
+  }
+  $('voice-close').addEventListener('click', function () { $('voice-panel').classList.add('hidden'); });
+  function sendTyped() {
+    var v = $('voice-text').value;
+    $('voice-text').value = '';
+    handleVoiceCommand(v);
+  }
+  $('voice-send').addEventListener('click', sendTyped);
+  $('voice-text').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendTyped(); });
+
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);
   var wantVessel = qs.get('vessel');
@@ -573,6 +698,7 @@
   }
   if (qs.get('replay') === '1') { setTimeout(startReplay, 2500); }
   if (qs.get('cond') === '1') { $('cond-panel').classList.remove('hidden'); loadConditions(); }
+  if (qs.get('say')) { setTimeout(function () { handleVoiceCommand(qs.get('say')); }, 3000); }
 
   // ---------- start ----------
   setStatus('warm', 'CONNECTING');

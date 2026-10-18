@@ -178,3 +178,32 @@ body {
   .card { z-index: 25; }
   .cond-chip { top: calc(110px + env(safe-area-inset-top)); }
 }
+
+/* 0.1b: voice commands */
+#voice-btn {
+  position: absolute; right: 14px; bottom: calc(112px + env(safe-area-inset-bottom)); z-index: 20;
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 1px solid rgba(56,189,248,0.5); background: var(--panel); color: #7dd3fc;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; backdrop-filter: blur(8px); box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+}
+#voice-btn.listening { background: rgba(239,68,68,0.85); color: #fff; border-color: #ef4444; animation: pulse 1.2s infinite; }
+#voice-status { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.voice-line { font-size: 13.5px; line-height: 1.4; margin-top: 8px; padding: 8px 10px; border-radius: 9px; }
+#voice-heard { background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); }
+#voice-heard::before { content: 'You: '; font-weight: 800; color: #7dd3fc; }
+#voice-reply { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.35); }
+#voice-reply::before { content: 'CargoIQ: '; font-weight: 800; color: #4ade80; }
+#voice-input-row { display: flex; gap: 6px; margin-top: 10px; }
+#voice-text {
+  flex: 1; background: rgba(15,23,42,0.85); border: 1px solid var(--line); color: var(--text);
+  border-radius: 9px; padding: 8px 10px; font-size: 13px; outline: none;
+}
+#voice-send {
+  border: 1px solid rgba(56,189,248,0.5); background: rgba(56,189,248,0.15); color: #7dd3fc;
+  border-radius: 9px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+#voice-help { margin-top: 10px; font-size: 12px; color: var(--muted); }
+#voice-help summary { cursor: pointer; font-weight: 700; }
+#voice-help ul { margin: 6px 0 0; padding-left: 18px; }
+#voice-help li { margin: 2px 0; }
