@@ -781,34 +781,68 @@
     logVoiceMiss(raw, resolved);
   }
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var rec = null, listening = false;
+  var rec = null, listening = false, finalHeard = '';
   var voiceBtn = $('voice-btn');
+  var inIframe = (function () { try { return window.self !== window.top; } catch (e) { return true; } })();
+  function voiceStatus(msg) { $('voice-status').textContent = msg; }
   function setListening(on) {
     listening = on;
     voiceBtn.classList.toggle('listening', on);
-    $('voice-status').textContent = on ? 'Listening... speak now.' : 'Hold the mic and speak, or type below.';
+    if (on) voiceStatus('Listening... tap the mic again to stop.');
+    else if (!voiceStatusLocked) voiceStatus('Tap the mic to speak. Tap again to stop. Or type below.');
+  }
+  var voiceStatusLocked = false;
+  function voiceError(err) {
+    var msg = 'Something stopped the microphone. Typing below always works.';
+    if (err === 'not-allowed' || err === 'service-not-allowed') {
+      msg = inIframe
+        ? 'Microphone is blocked inside the CargoIQ page frame. We are fixing that now - type below meanwhile, or open the map directly at nahalabs.co.za/gods-eye.'
+        : 'Microphone permission denied. Allow the mic for this site in your browser settings, then tap the mic again. Typing below works too.';
+    } else if (err === 'audio-capture') {
+      msg = 'No microphone found on this device. Typing below works.';
+    } else if (err === 'network') {
+      msg = 'Speech service unreachable (network). Check your connection or type below.';
+    } else if (err === 'no-speech') {
+      msg = 'I heard nothing. Tap the mic and speak closer to the phone, or type below.';
+    } else if (err === 'aborted') {
+      return; // user tapped stop - no error
+    }
+    voiceStatusLocked = true;
+    voiceStatus(msg);
+    setTimeout(function () { voiceStatusLocked = false; if (!listening) setListening(false); }, 9000);
   }
   if (SR) {
     rec = new SR();
     rec.lang = 'en-ZA';
-    rec.interimResults = false;
+    rec.interimResults = true;
+    rec.continuous = true;
     rec.maxAlternatives = 1;
     rec.onresult = function (e) {
-      var text = e.results[0][0].transcript;
-      handleVoiceCommand(text);
+      var interim = '', fin = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      if (interim) { finalHeard = interim; voiceStatus('Hearing: "' + interim + '"'); }
+      if (fin) {
+        handleVoiceCommand(fin.trim());
+        finalHeard = '';
+        try { rec.stop(); } catch (err) {}
+      }
     };
     rec.onend = function () { setListening(false); };
-    rec.onerror = function () { setListening(false); };
-    var startRec = function (ev) {
+    rec.onerror = function (e) { setListening(false); voiceError(e.error); };
+    voiceBtn.addEventListener('click', function (ev) {
       ev.preventDefault();
-      if (listening) { rec.stop(); return; }
-      try { rec.start(); setListening(true); $('voice-panel').classList.remove('hidden'); } catch (err) {}
-    };
-    voiceBtn.addEventListener('click', startRec);
+      $('voice-panel').classList.remove('hidden');
+      if (listening) { try { rec.stop(); } catch (err) {} setListening(false); return; }
+      voiceStatusLocked = false;
+      try { rec.start(); setListening(true); } catch (err) { voiceError('start-failed'); }
+    });
   } else {
     voiceBtn.addEventListener('click', function () {
       $('voice-panel').classList.toggle('hidden');
-      $('voice-status').textContent = 'This browser has no speech recognition - type your command below.';
+      voiceStatus('This browser cannot do speech recognition (common in older iPhones and embedded views). Type your command below - it works the same.');
     });
   }
   $('voice-close').addEventListener('click', function () { $('voice-panel').classList.add('hidden'); });
