@@ -998,7 +998,7 @@
     var bar = $('scrub-bar');
     bar.classList.toggle('hidden');
     if (bar.classList.contains('hidden') || Math.abs((NOW_MIN + parseInt(slider.value, 10) * 900) - Date.now() / 1000) < 450) {
-      slider.value = 288;
+      slider.value = 192;
       applyScrub(Date.now() / 1000);
     } else {
       loadScrubWeather();
