@@ -303,13 +303,21 @@
     ws.onmessage = function (ev) {
       gotAny = true;
       clearTimeout(opener);
+      var m;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      var isInit = m.MessageType === 'NahaLabsInit';
+      var hasLiveShips = (m.MessageType === 'PositionReport') ||
+                         (isInit && Array.isArray(m.Vessels) && m.Vessels.length > 0);
+      if (isInit && (!Array.isArray(m.Vessels) || m.Vessels.length === 0)) {
+        loadSnapshot(); // relay is up but its upstream is dry: show last real picture
+        setStatus('warm', 'RECONNECTING');
+        return;
+      }
       lastLiveMsg = Date.now();
-      if (!liveConnected) {
+      if (hasLiveShips && !liveConnected) {
         liveConnected = true;
         setStatus('live', 'LIVE');
       }
-      var m;
-      try { m = JSON.parse(ev.data); } catch (e) { return; }
       ingestMessage(m, false);
     };
     ws.onclose = function () {
