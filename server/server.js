@@ -9,6 +9,19 @@ const vessels = new Map(); // mmsi -> latest record
 const clients = new Set();
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/voice-miss') {
+    res.setHeader('access-control-allow-origin', '*');
+    res.setHeader('access-control-allow-methods', 'POST, OPTIONS');
+    res.setHeader('access-control-allow-headers', 'content-type');
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 2000) req.destroy(); });
+      req.on('end', () => { console.log('[voice-miss]', body.slice(0, 500)); res.writeHead(204); res.end(); });
+      return;
+    }
+    res.writeHead(405); res.end(); return;
+  }
   if (req.url === '/healthz') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, vessels: vessels.size, clients: clients.size, upstream: upstreamLive }));

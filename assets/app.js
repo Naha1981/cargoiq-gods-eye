@@ -555,6 +555,102 @@
 
 
   // ---------- voice commands (push-to-talk + typed fallback) ----------
+  // ---------- voice alias + fuzzy layer (ASR mis-transcription tolerant) ----------
+  function normVoice(t) {
+    return (t || '').toLowerCase()
+      .replace(/[\u2018\u2019']/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function lev(a, b) {
+    if (Math.abs(a.length - b.length) > 3) return 99;
+    var m = a.length, n = b.length, d = [];
+    for (var i = 0; i <= m; i++) { d[i] = [i]; }
+    for (var j = 0; j <= n; j++) { d[0][j] = j; }
+    for (i = 1; i <= m; i++) for (j = 1; j <= n; j++) {
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    }
+    return d[m][n];
+  }
+  function aliasHit(t, names) {
+    // exact alias phrase containment first
+    for (var k = 0; k < names.length; k++) {
+      if (t.indexOf(names[k]) >= 0) return { ok: true, how: 'alias' };
+    }
+    // fuzzy: any alias word close to any heard word
+    var words = t.split(' ');
+    for (k = 0; k < names.length; k++) {
+      var aliasWords = names[k].split(' ');
+      for (var a = 0; a < aliasWords.length; a++) {
+        var aw = aliasWords[a];
+        if (aw.length < 4) continue;
+        for (var w = 0; w < words.length; w++) {
+          if (words[w].length >= 4 && lev(words[w], aw) <= (aw.length >= 7 ? 2 : 1)) return { ok: true, how: 'fuzzy' };
+        }
+      }
+    }
+    return { ok: false };
+  }
+  var VOICE_PLACES = [
+    { key: 'durban', names: ['durban', 'derban', 'durbun', 'ethekwini', 'ethekweni', 'tekwini'], view: 'durban', reply: 'Flying to Durban harbour.', audio: 'durban' },
+    { key: 'richards', names: ['richards bay', 'richards', 'richard bay', 'richards bae', 'richardspay'], view: 'richards', reply: 'Flying to Richards Bay. Note: terrestrial A I S coverage there is currently zero. A known dead zone.', audio: 'richards' },
+    { key: 'capetown', names: ['cape town', 'capetown', 'kaapstad'], lon: 18.43, lat: -33.91, alt: 55000, reply: 'Cape Town is outside the current evidence coverage. Durban and Richards Bay are instrumented.' },
+    { key: 'gqeberha', names: ['gqeberha', 'port elizabeth', 'qeberha', 'gheberha', 'geberha'], lon: 25.63, lat: -33.97, alt: 55000, reply: 'Gqeberha, Port Elizabeth, is outside the current evidence coverage.' },
+    { key: 'coega', names: ['coega', 'ngqura', 'kuga', 'incura'], lon: 25.69, lat: -33.79, alt: 40000, reply: 'Coega, Ngqura, is outside the current evidence coverage.' },
+    { key: 'eastlondon', names: ['east london', 'buffalo city'], lon: 27.91, lat: -33.02, alt: 40000, reply: 'East London is outside the current evidence coverage.' },
+    { key: 'saldanha', names: ['saldanha', 'saldana'], lon: 17.95, lat: -33.02, alt: 40000, reply: 'Saldanha is outside the current evidence coverage.' },
+    { key: 'mosselbay', names: ['mossel bay', 'mosel bay'], lon: 22.13, lat: -34.18, alt: 40000, reply: 'Mossel Bay is outside the current evidence coverage.' }
+  ];
+  var VOICE_TERMINALS = [
+    { key: 'dgt', names: ['dgt', 'berth 108', 'berth one zero eight', 'durban general', 'container terminal', 'dct'], lon: 31.0395, lat: -29.8698, alt: 8000, reply: 'Flying to the Durban container terminal area, where the disputed container is held.' },
+    { key: 'bayhead', names: ['bayhead', 'bay head'], lon: 31.031, lat: -29.871, alt: 10000, reply: 'Flying to Bayhead.' },
+    { key: 'point', names: ['the point', 'point terminal', 'point waterfront'], lon: 31.041, lat: -29.856, alt: 10000, reply: 'Flying to the Point area.' },
+    { key: 'maydon', names: ['maydon wharf', 'madonna wharf', 'maiden wharf'], lon: 31.018, lat: -29.885, alt: 10000, reply: 'Flying to Maydon Wharf.' },
+    { key: 'islandview', names: ['island view', 'islandview'], lon: 31.005, lat: -29.878, alt: 10000, reply: 'Flying to Island View.' }
+  ];
+  var VOICE_DISPUTE_WORDS = ['dispute', 'disputed', 'container', 'msku', 'musku', 'umhlanga', 'umshlanga', 'the case', 'our case'];
+  function logVoiceMiss(heard, resolved) {
+    try {
+      var buf = JSON.parse(localStorage.getItem('gev-voice-log') || '[]');
+      buf.push({ heard: heard, resolved: resolved, ts: new Date().toISOString() });
+      if (buf.length > 50) buf = buf.slice(-50);
+      localStorage.setItem('gev-voice-log', JSON.stringify(buf));
+    } catch (e) {}
+    try {
+      fetch('https://cargoiq-gods-eye.onrender.com/voice-miss', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ heard: heard, resolved: resolved, ts: Date.now() })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  function findVesselFuzzy(heard) {
+    var t = normVoice(heard);
+    var best = null, bestScore = 0;
+    vessels.forEach(function (v, mmsi) {
+      var vn = normVoice(v.rec && v.rec.name ? v.rec.name : '');
+      if (!vn) return;
+      var score = 0;
+      if (vn === t) score = 100;
+      else if (vn.indexOf(t) >= 0 || t.indexOf(vn) >= 0) score = 80;
+      else {
+        var vtok = vn.split(' '), ttok = t.split(' ');
+        for (var i = 0; i < ttok.length; i++) {
+          if (ttok[i].length < 3) continue;
+          for (var j = 0; j < vtok.length; j++) {
+            if (vtok[j].length < 3) continue;
+            var d = lev(ttok[i], vtok[j]);
+            if (d === 0) score = Math.max(score, 60);
+            else if (d <= 1) score = Math.max(score, 45);
+            else if (d <= 2 && vtok[j].length >= 6) score = Math.max(score, 30);
+          }
+        }
+      }
+      if (score > bestScore) { bestScore = score; best = mmsi; }
+    });
+    return bestScore >= 30 ? { mmsi: best, score: bestScore } : null;
+  }
+
   var voiceRepliesAudio = {}, voiceToastTimer = null;
   function cargoSay(text, audioKey) {
     var r = $('voice-reply');
@@ -595,54 +691,77 @@
     return best;
   }
   function handleVoiceCommand(raw) {
-    var t = (raw || '').toLowerCase().trim();
-    if (!t) return;
+    var t0 = (raw || '').toLowerCase().trim();
+    if (!t0) return;
     cargoHeard(raw);
+    var t = normVoice(t0);
+    var resolved = 'miss';
+
     if (/\bstop\b|\bcancel\b/.test(t)) {
-      stopReplay(); stopTrack();
+      stopReplay(); stopTrack(); resolved = 'stop';
       cargoSay('Stopped. The harbour is yours.', 'stop');
-    } else if (/richards/.test(t)) {
-      flyTo('richards');
-      cargoSay('Flying to Richards Bay. Note: terrestrial AIS coverage there is currently zero - a known dead zone.', 'richards');
-    } else if (/durban/.test(t)) {
-      flyTo('durban');
-      cargoSay('Flying to Durban harbour.', 'durban');
-    } else if (/disput|container|msku|umhlanga/.test(t)) {
+    } else if (aliasHit(t, VOICE_DISPUTE_WORDS).ok) {
       flyTo('dispute');
       setTimeout(function () { $('dispute-card').classList.remove('hidden'); $('info-card').classList.add('hidden'); }, 2500);
+      resolved = 'dispute';
       cargoSay('Showing disputed container MSKU 482931 7, held at Durban Container Terminal. Sample data, fictional records.', 'dispute');
-    } else if (/replay|walk me|timeline/.test(t)) {
-      startReplay();
+    } else if (/replay|walk me|timeline|play the case/.test(t)) {
+      startReplay(); resolved = 'replay';
       cargoSay('Replaying case DUR-2026-0412: arrival, berthing, free-time expiry, invoice.', 'replay');
-    } else if (/condition|weather|wave|wind|swell/.test(t)) {
+    } else if (aliasHit(t, ['condition', 'conditions', 'weather', 'wave', 'waves', 'wind', 'swell', 'whether']).ok) {
       $('cond-panel').classList.remove('hidden');
-      loadConditions();
+      loadConditions(); resolved = 'conditions';
       cargoSay('Here are the current port conditions for Durban.', 'conditions');
-    } else if (/camera|cctv|footage|pier/.test(t)) {
+    } else if (aliasHit(t, ['camera', 'cameras', 'cctv', 'footage', 'pier', 'webcam', 'footage']).ok) {
       var c = null;
       if (selectedMmsi && vessels.get(selectedMmsi)) {
-        var v = vessels.get(selectedMmsi);
-        c = nearestCamTo(v.rec.lon, v.rec.lat);
+        var v0 = vessels.get(selectedMmsi);
+        c = nearestCamTo(v0.rec.lon, v0.rec.lat);
       } else {
         c = nearestCamTo(DISPUTE.lon, DISPUTE.lat);
       }
       if (c) { openCam(c); flyToPoint(c.lon, c.lat, 6000); }
+      resolved = 'camera';
       cargoSay('Opening the nearest live camera. Position approximate.', 'camera');
-    } else if (/track|find|where is|locate|follow/.test(t)) {
-      var name = t.replace(/track|find|where is|locate|follow|the|vessel|ship|please/g, ' ').replace(/\s+/g, ' ').trim();
-      var mmsi = name ? findVesselByName(name) : null;
-      if (mmsi) {
-        showVessel(mmsi);
-        flyToPoint(vessels.get(mmsi).rec.lon, vessels.get(mmsi).rec.lat, 15000);
-        cargoSay('Tracking ' + (vessels.get(mmsi).rec.name || ('MMSI ' + mmsi)) + '.', 'track');
+    } else if (/track|find|where is|locate|follow|show me the vessel|show the vessel/.test(t)) {
+      var name = t.replace(/track|find|where is|locate|follow|show me|show|the vessel|the ship|vessel|ship|please/g, ' ').replace(/\s+/g, ' ').trim();
+      var hit = name ? findVesselFuzzy(name) : null;
+      if (hit) {
+        showVessel(hit.mmsi);
+        flyToPoint(vessels.get(hit.mmsi).rec.lon, vessels.get(hit.mmsi).rec.lat, 15000);
+        resolved = 'track:' + (vessels.get(hit.mmsi).rec.name || hit.mmsi) + ' score ' + hit.score;
+        cargoSay('Tracking ' + (vessels.get(hit.mmsi).rec.name || ('MMSI ' + hit.mmsi)) + '.', 'track');
       } else {
+        resolved = 'miss:vessel:' + name;
         cargoSay('I could not find that vessel in the current feed. Try its name as shown on the map.', null);
       }
-    } else if (/help|what can you/.test(t)) {
-      cargoSay('Try: show Durban, show the disputed container, track a vessel name, nearest camera, port conditions, replay the case, or stop.', null);
     } else {
-      cargoSay('I did not catch a command. Tap "What you can say" for examples.', null);
+      var placed = false;
+      for (var p = 0; p < VOICE_TERMINALS.length; p++) {
+        var term = VOICE_TERMINALS[p];
+        if (aliasHit(t, term.names).ok) { flyToPoint(term.lon, term.lat, term.alt); resolved = 'terminal:' + term.key; cargoSay(term.reply, term.audio || null); placed = true; break; }
+      }
+      if (!placed) {
+        for (p = 0; p < VOICE_PLACES.length; p++) {
+          var pl = VOICE_PLACES[p];
+          if (aliasHit(t, pl.names).ok) {
+            if (pl.view) flyTo(pl.view); else flyToPoint(pl.lon, pl.lat, pl.alt);
+            resolved = 'place:' + pl.key;
+            cargoSay(pl.reply, pl.audio || null);
+            placed = true; break;
+          }
+        }
+      }
+      if (!placed) {
+        if (/help|what can you/.test(t)) {
+          resolved = 'help';
+          cargoSay('Try: show Durban, show the disputed container, track a vessel name, nearest camera, port conditions, replay the case, or stop.', null);
+        } else {
+          cargoSay('I did not catch a command. Tap "What you can say" for examples.', null);
+        }
+      }
     }
+    logVoiceMiss(raw, resolved);
   }
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var rec = null, listening = false;
