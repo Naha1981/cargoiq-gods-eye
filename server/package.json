@@ -1,0 +1,10 @@
+{
+  "name": "cargoiq-gods-eye-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Server-side AIS relay for the CargoIQ Live Harbour View proof. Keeps the AISStream key server-side.",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "^8.18.0" },
+  "engines": { "node": ">=18" }
+}

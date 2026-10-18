@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CargoIQ Live Harbour View - NahaLabs</title>
+<meta name="description" content="Live vessel picture over Durban and Richards Bay, with disputed-cargo evidence pinned on the map. A CargoIQ proof by NahaLabs.">
+<meta property="og:title" content="CargoIQ Live Harbour View">
+<meta property="og:description" content="Live vessels around Durban and Richards Bay. One disputed container, pinned.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0f1a'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2322c55e' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='%2322c55e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Widgets/widgets.css">
+<link rel="stylesheet" href="assets/styles.css">
+<script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/';</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Cesium.js"></script>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+
+<header id="hud-top">
+  <div class="brand">
+    <span class="wordmark">NAHALABS</span>
+    <span class="product">CargoIQ <em>Live Harbour View</em></span>
+  </div>
+  <div id="status-pill" class="pill pill-warm"><span class="dot"></span><span id="status-text">CONNECTING</span></div>
+</header>
+
+<nav id="hud-flyto" aria-label="Fly to">
+  <button class="flybtn" data-target="durban">Durban</button>
+  <button class="flybtn" data-target="richards">Richards Bay</button>
+  <button class="flybtn flybtn-alert" data-target="dispute">Disputed container</button>
+</nav>
+
+<div id="vessel-count" class="count-chip">0 vessels</div>
+
+<section id="info-card" class="card hidden" aria-live="polite">
+  <button id="info-close" class="card-close" aria-label="Close">&times;</button>
+  <h3 id="info-title">Vessel</h3>
+  <dl id="info-body"></dl>
+  <p class="card-source">Live AIS position</p>
+</section>
+
+<section id="dispute-card" class="card card-alert hidden" aria-live="polite">
+  <button id="dispute-close" class="card-close" aria-label="Close">&times;</button>
+  <h3>Disputed container <span class="tag">DUR-2026-0412</span></h3>
+  <dl>
+    <dt>Container</dt><dd>MSKU 482931 7</dd>
+    <dt>Vessel</dt><dd>MV Umhlanga Trader</dd>
+    <dt>Issue</dt><dd>Demurrage: free-time expiry vs berthing delay</dd>
+    <dt>Status</dt><dd>2 open contradictions on the evidence timeline</dd>
+  </dl>
+  <p class="card-source">Sample data. Fictional records.</p>
+</section>
+
+<button id="attr-btn" aria-label="Data and sources">i</button>
+<div id="attr-modal" class="hidden" role="dialog" aria-modal="true" aria-label="Data and sources">
+  <div class="attr-box">
+    <button id="attr-close" class="card-close" aria-label="Close">&times;</button>
+    <h3>Data &amp; sources</h3>
+    <ul>
+      <li>Live vessel positions: AIS stream (terrestrial coastal stations).</li>
+      <li>Imagery: Esri World Imagery (Esri, Maxar, Earthstar Geographics).</li>
+      <li>Terrain: Re:Earth Terrain.</li>
+      <li>Map engine: CesiumJS (Apache-2.0).</li>
+      <li>The pinned disputed container (case DUR-2026-0412) is sample data. Fictional records.</li>
+    </ul>
+    <p class="attr-note">Terrestrial AIS covers coastal waters; ships beyond receiver range are not shown.</p>
+  </div>
+</div>
+
+<div id="fatal" class="hidden">
+  <div class="attr-box"><h3>Map failed to start</h3><p class="attr-note">This device or browser could not start WebGL. Try a current version of Chrome, Edge or Safari.</p></div>
+</div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
