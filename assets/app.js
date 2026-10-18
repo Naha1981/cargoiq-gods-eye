@@ -67,7 +67,10 @@
   if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = !isMobile;
   if (isMobile) {
     viewer.resolutionScale = 0.8;
-    setTimeout(function () { $('desktop-note').classList.remove('hidden'); }, 2500);
+    setTimeout(function () {
+      $('desktop-note').classList.remove('hidden');
+      setTimeout(function () { $('desktop-note').classList.add('hidden'); }, 9000);
+    }, 2500);
   }
   $('desktop-note-ok').addEventListener('click', function () { $('desktop-note').classList.add('hidden'); });
   viewer.scene.globe.enableLighting = false;
