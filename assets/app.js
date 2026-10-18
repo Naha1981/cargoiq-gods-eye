@@ -203,15 +203,15 @@
   handler.setInputAction(function (movement) {
     var picked = scene.pick(movement.position);
     if (Cesium.defined(picked) && picked.id === disputeEntity) {
-      $('dispute-card').classList.remove('hidden');
-      $('info-card').classList.add('hidden');
+      showPeek('dispute', null); peekPinned = true;
       return;
     }
     if (Cesium.defined(picked) && picked.id) {
       var found = null;
       vessels.forEach(function (v, mmsi) { if (v.entity === picked.id) found = mmsi; });
-      if (found) { showVessel(found); return; }
+      if (found) { showPeek('vessel', found); peekPinned = true; return; }
     }
+    hidePeek();
     $('info-card').classList.add('hidden');
     $('dispute-card').classList.add('hidden');
     selectedMmsi = null;
@@ -520,7 +520,7 @@
     if (Cesium.defined(picked) && picked.id) {
       var cam = null;
       CAMERAS.forEach(function (c) { if (c._entity === picked.id) cam = c; });
-      if (cam) { openCam(cam); return; }
+      if (cam) { showPeek('cam', cam); peekPinned = true; return; }
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -941,7 +941,7 @@
   handler.setInputAction(function (movement) {
     var picked = scene.pick(movement.position);
     if (Cesium.defined(picked) && picked.id && picked.id._evidence) {
-      openEvidence(picked.id._evidence);
+      showPeek('evidence', picked.id._evidence); peekPinned = true;
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -1418,6 +1418,104 @@
   $('recon-fp').addEventListener('click', function () { $('recon-panel').classList.add('hidden'); fpStart(); });
   $('fp-stop').addEventListener('click', fpStop);
 
+
+  // ---------- instant preview cards (tap/hover any map item) ----------
+  var peekCurrent = null, peekPinned = false;
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); }
+  function compassOf(deg) {
+    if (typeof deg !== 'number') return '-';
+    var dirs = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+    return dirs[Math.round(deg / 45) % 8];
+  }
+  function hidePeek() { peekCurrent = null; peekPinned = false; $('peek-card').classList.add('hidden'); }
+  function showPeek(kind, ref) {
+    peekCurrent = { kind: kind, ref: ref };
+    var badge = '', title = '', rows = '', source = '', moreLabel = 'Full details';
+    if (kind === 'vessel') {
+      var v = vessels.get(ref);
+      if (!v) return;
+      var r = v.rec;
+      var isCaseShip = (r.name || '') === 'MV Umhlanga Trader';
+      badge = isCaseShip ? ' <span class="dispute-badge">DISPUTED</span>' : '';
+      title = esc(r.name || ('Ship ' + ref)) + badge;
+      rows =
+        '<dt>Ship ID</dt><dd>MMSI ' + esc(ref) + '</dd>' +
+        '<dt>Speed</dt><dd>' + (typeof r.sog === 'number' ? r.sog.toFixed(1) + ' knots' : 'Not moving / unknown') + '</dd>' +
+        '<dt>Heading</dt><dd>' + (typeof r.cog === 'number' ? compassOf(r.cog) + ' (' + Math.round(r.cog) + '\u00B0)' : '-') + '</dd>' +
+        '<dt>Position</dt><dd>' + (typeof r.lat === 'number' ? Math.abs(r.lat).toFixed(3) + '\u00B0 S, ' + Math.abs(r.lon).toFixed(3) + '\u00B0 E' : '-') + '</dd>' +
+        '<dt>Position age</dt><dd>' + (v.fromSnapshot ? 'From the last saved picture of the harbour' : 'Live right now') + '</dd>' +
+        (isCaseShip ? '<dt>Dispute</dt><dd>This ship is part of dispute DUR-2026-0412</dd>' : '');
+      source = 'Live AIS position';
+    } else if (kind === 'cam') {
+      title = esc(ref.name);
+      var cover = ref.id === 'vetchs' ? 'Covers the harbour mouth and the Vetch\'s Pier side' : 'Covers the beachfront and the northern approach';
+      rows =
+        '<dt>Where</dt><dd>' + esc(ref.name.split(' - ')[1] || 'Durban') + '</dd>' +
+        '<dt>Coverage</dt><dd>' + cover + '</dd>' +
+        '<dt>Refresh</dt><dd>Grabs a fresh photo about every 10 seconds while open</dd>';
+      source = esc(ref.source);
+      moreLabel = 'Open live view';
+    } else if (kind === 'evidence') {
+      var inWin = SCRUB.evidence && ref.ts >= CASE.events[0].ts && ref.ts <= CASE.events[3].ts;
+      badge = ' <span class="dispute-badge">DISPUTED</span>';
+      title = esc(ref.title) + badge;
+      var kindLabel = ref.type === 'cam' ? 'Camera photo' : ref.type === 'doc' ? 'Document' : 'Log note';
+      rows =
+        '<dt>What</dt><dd>' + kindLabel + '</dd>' +
+        '<dt>Time</dt><dd>' + fmtSAST(ref.ts) + ' SAST</dd>' +
+        '<dt>Dispute</dt><dd>Evidence in case ' + esc(SCRUB.evidence ? SCRUB.evidence.case : 'DUR-2026-0412') + (inWin ? ' - inside the disputed window' : '') + '</dd>';
+      source = 'Sample data. Fictional records.';
+      moreLabel = 'Open evidence';
+    } else if (kind === 'dispute') {
+      badge = ' <span class="dispute-badge">DISPUTED</span>';
+      title = 'Disputed container' + badge;
+      rows =
+        '<dt>Case</dt><dd>DUR-2026-0412</dd>' +
+        '<dt>Container</dt><dd>MSKU 482931 7</dd>' +
+        '<dt>Issue</dt><dd>Demurrage: free-time expiry vs berthing delay</dd>' +
+        '<dt>Status</dt><dd>2 open contradictions on the evidence timeline</dd>';
+      source = 'Sample data. Fictional records.';
+      moreLabel = 'Open case card';
+    }
+    $('peek-title').innerHTML = title;
+    $('peek-body').innerHTML = rows;
+    $('peek-source').textContent = source;
+    $('peek-more').textContent = moreLabel;
+    $('peek-card').classList.remove('hidden');
+  }
+  $('peek-close').addEventListener('click', hidePeek);
+  $('peek-more').addEventListener('click', function () {
+    if (!peekCurrent) return;
+    var k = peekCurrent.kind, r = peekCurrent.ref;
+    hidePeek();
+    if (k === 'vessel') showVessel(r);
+    else if (k === 'cam') openCam(r);
+    else if (k === 'evidence') openEvidence(r);
+    else if (k === 'dispute') { $('info-card').classList.add('hidden'); $('dispute-card').classList.remove('hidden'); }
+  });
+  // Hover previews on desktop pointers
+  if (!isMobile && !LITE && window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+    var lastHover = 0;
+    handler.setInputAction(function (movement) {
+      if (peekPinned) return;
+      var now = Date.now();
+      if (now - lastHover < 150) return;
+      lastHover = now;
+      var picked = scene.pick(movement.endPosition);
+      if (Cesium.defined(picked) && picked.id) {
+        if (picked.id === disputeEntity) { showPeek('dispute', null); return; }
+        if (picked.id._evidence) { showPeek('evidence', picked.id._evidence); return; }
+        var cam = null;
+        CAMERAS.forEach(function (c) { if (c._entity === picked.id) cam = c; });
+        if (cam) { showPeek('cam', cam); return; }
+        var m = null;
+        vessels.forEach(function (v, mmsi) { if (v.entity === picked.id) m = mmsi; });
+        if (m) { showPeek('vessel', m); return; }
+      }
+      hidePeek();
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+  }
+
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);
   var wantVessel = qs.get('vessel');
@@ -1444,6 +1542,16 @@
   if (qs.get('recon') === '1') { $('recon-btn').click(); }
   if (qs.get('fp') === '1') { setTimeout(fpStart, 2500); }
   if (qs.get('mic') === 'start') { setTimeout(function () { $('voice-btn').click(); }, 2500); }
+  if (qs.get('peek')) {
+    var want = qs.get('peek'), tries0 = 0;
+    var peekPoll = setInterval(function () {
+      tries0++;
+      if (want === 'vessel' && vessels.size) { clearInterval(peekPoll); showPeek('vessel', vessels.keys().next().value); peekPinned = true; }
+      else if (want === 'cam') { clearInterval(peekPoll); showPeek('cam', CAMERAS[0]); peekPinned = true; }
+      else if (want === 'dispute') { clearInterval(peekPoll); showPeek('dispute', null); peekPinned = true; }
+      else if (tries0 > 20) clearInterval(peekPoll);
+    }, 500);
+  }
   if (qs.get('micerror')) { setTimeout(function () { $('voice-panel').classList.remove('hidden'); voiceError(qs.get('micerror')); }, 2500); }
   if (qs.get('t')) {
     setTimeout(function () {

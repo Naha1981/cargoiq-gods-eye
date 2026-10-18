@@ -301,3 +301,14 @@ body {
 #scrub-readout.in-window { font-family: 'JetBrains Mono', ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.06em; color: #fca5a5; }
 .support-line { margin-top: 8px; font-size: 11px; color: var(--muted); }
 .support-line a { color: #7dd3fc; text-decoration: none; }
+
+/* ---------- instant preview card (tap/hover any map item) ---------- */
+#peek-card {
+  border-color: rgba(56, 189, 248, 0.35);
+  animation: peek-in 0.14s ease-out;
+}
+@keyframes peek-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#peek-card .dispute-badge { margin-left: 6px; }
