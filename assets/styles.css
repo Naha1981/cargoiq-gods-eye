@@ -264,7 +264,7 @@ body {
   pointer-events: none;
 }
 #scrub-window span {
-  position: absolute; top: -13px; left: 0; font-size: 8px; font-weight: 800;
+  position: absolute; bottom: -12px; left: 0; font-size: 8px; font-weight: 800;
   letter-spacing: 0.1em; color: #fca5a5; white-space: nowrap;
 }
 #case-card h3, #ev-card h3 { color: #fca5a5; }
