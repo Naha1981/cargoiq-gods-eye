@@ -928,6 +928,8 @@
   }
   function applyScrub(t) {
     SCRUB.t = t;
+    var inWindow = SCRUB.evidence && t >= CASE.events[0].ts && t <= CASE.events[3].ts;
+    var winPrefix = inWindow ? 'DISPUTED WINDOW - ' : '';
     var now = Date.now() / 1000;
     var isFuture = t > now + 300;
     var isLive = Math.abs(t - now) < 450;
@@ -954,7 +956,7 @@
         if (mi !== null && SCRUB.marine.wave_height[mi] != null) wtxt += ' | waves ' + SCRUB.marine.wave_height[mi] + 'm';
       }
     }
-    $('scrub-readout').textContent = label + wtxt;
+    $('scrub-readout').textContent = winPrefix + label + wtxt;
     // vessels at t
     if (isFuture) {
       clearScrubEntities();
@@ -988,12 +990,10 @@
             }
           }));
         });
-        $('scrub-readout').textContent = fmtSAST(t) + ' SAST | positions as of ' + fmtHour(best.ts) + ' SAST' + wtxt;
+        $('scrub-readout').textContent = winPrefix + fmtSAST(t) + ' SAST | positions as of ' + fmtHour(best.ts) + ' SAST' + wtxt;
       });
     }
-    var inWindow = SCRUB.evidence && t >= CASE.events[0].ts && t <= CASE.events[3].ts;
     $('scrub-readout').classList.toggle('in-window', !!inWindow);
-    if (inWindow) $('scrub-readout').textContent = 'DISPUTED WINDOW - ' + $('scrub-readout').textContent;
     // evidence pins: highlight within 45min, dim future pins
     evidenceEntities.forEach(function (e) {
       var dt = e._evidence.ts - t;
