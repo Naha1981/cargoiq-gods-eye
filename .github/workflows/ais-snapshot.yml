@@ -18,9 +18,11 @@ jobs:
         env:
           AIS_KEY: ${{ secrets.AISSTREAM_API_KEY }}
         run: python3 collector/collect.py 150
+      - name: Archive history, cameras, forecast
+        run: python3 collector/archive.py
       - name: Commit refreshed snapshot
         run: |
           git config user.name "NahaLabs automation"
           git config user.email "ai-solutions@nahalabs.co.za"
-          git add data/vessels-snapshot.json
-          if git diff --cached --quiet; then echo "no change"; else git commit -m "AIS snapshot refresh $(date -u +'%Y-%m-%d %H:%M UTC')"; git push; fi
+          git add data/
+          if git diff --cached --quiet; then echo "no change"; else git commit -m "AIS + evidence archive refresh $(date -u +'%Y-%m-%d %H:%M UTC')"; git push; fi

@@ -19,6 +19,21 @@
   <button id="voice-btn" aria-label="Voice commands">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
   </button>
+
+  <button id="scrub-chip" class="cond-chip" style="right: 14px; top: calc(112px + env(safe-area-inset-top));">TIME</button>
+  <div id="scrub-bar" class="hidden">
+    <div id="scrub-readout">Live - now</div>
+    <input id="scrub-slider" type="range" min="0" max="384" value="288" step="1">
+    <div id="scrub-ends"><span id="scrub-min"></span><span id="scrub-max"></span></div>
+  </div>
+  <div id="ev-card" class="card hidden">
+    <button id="ev-close" class="close-x" aria-label="Close">&times;</button>
+    <h3 id="ev-title">Evidence</h3>
+    <div id="ev-meta" class="kv"></div>
+    <img id="ev-img" class="cam-frame hidden" alt="evidence frame">
+    <p id="ev-desc" class="replay-desc"></p>
+    <div class="fine">Sample data. Fictional records.</div>
+  </div>
   <div id="voice-toast" class="hidden"></div>
   <div id="voice-panel" class="card hidden">
     <button id="voice-close" class="close-x" aria-label="Close">&times;</button>

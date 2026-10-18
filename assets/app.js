@@ -803,6 +803,205 @@
   $('voice-send').addEventListener('click', sendTyped);
   $('voice-text').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendTyped(); });
 
+
+  // ---------- evidence scrubber + pins (items 1+2) ----------
+  var SCRUB = { index: null, evidence: null, hist: {}, wx: null, marine: null, entities: [], active: false, t: null };
+  function fmtSAST(epochSec) {
+    return new Date(epochSec * 1000).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', weekday: 'short', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short', hour12: false });
+  }
+  function fmtHour(epochSec) {
+    return new Date(epochSec * 1000).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  fetch('data/scrub-index.json').then(function (r) { return r.json(); }).then(function (j) { SCRUB.index = j; }).catch(function () {});
+  var evidenceEntities = [];
+  fetch('data/evidence.json').then(function (r) { return r.json(); }).then(function (j) {
+    SCRUB.evidence = j;
+    j.items.forEach(function (item) {
+      var ent = viewer.entities.add({
+        position: new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(item.lon, item.lat)),
+        point: {
+          pixelSize: 10,
+          color: Cesium.Color.fromCssColorString('#f472b6'),
+          outlineColor: Cesium.Color.WHITE, outlineWidth: 1.5,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        label: {
+          text: 'EV', font: 'bold 10px sans-serif',
+          fillColor: Cesium.Color.fromCssColorString('#f9a8d4'),
+          outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 120000),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        }
+      });
+      ent._evidence = item;
+      evidenceEntities.push(ent);
+    });
+  }).catch(function () {});
+  function camFrameFor(item, t) {
+    var img = $('ev-img');
+    var cid = item.cam || 'vetchs';
+    var slot = null;
+    if (SCRUB.index && SCRUB.index.cam && SCRUB.index.cam[cid]) {
+      var want = Math.floor(t / 3600), bestD = 1e9;
+      SCRUB.index.cam[cid].forEach(function (s2) {
+        if (Math.abs(s2 - want) < bestD) { bestD = Math.abs(s2 - want); slot = s2; }
+      });
+    }
+    if (slot !== null && bestD <= 6) {
+      img.src = 'data/cam/' + cid + '/' + slot + '.jpg';
+      $('ev-meta').innerHTML = '<dt>Time</dt><dd>' + fmtSAST(item.ts) + ' SAST</dd><dt>Frame</dt><dd>Archived frame ' + fmtHour(slot * 3600) + ' SAST</dd>';
+    } else {
+      var cam = CAMERAS.filter(function (c) { return c.id === cid; })[0];
+      img.src = (cam ? cam.img : CAMERAS[0].img) + '?t=' + Date.now();
+      $('ev-meta').innerHTML = '<dt>Time</dt><dd>' + fmtSAST(item.ts) + ' SAST</dd><dt>Frame</dt><dd>Live frame (no archive at this time yet)</dd>';
+    }
+    img.classList.remove('hidden');
+  }
+  function openEvidence(item) {
+    $('ev-title').textContent = item.title;
+    $('ev-desc').textContent = item.desc;
+    if (item.type === 'cam') {
+      camFrameFor(item, SCRUB.t || Date.now() / 1000);
+    } else {
+      $('ev-img').classList.add('hidden');
+      $('ev-meta').innerHTML = '<dt>Time</dt><dd>' + fmtSAST(item.ts) + ' SAST</dd><dt>Type</dt><dd>' + (item.type === 'doc' ? 'Document' : 'Log note') + '</dd>';
+    }
+    $('ev-card').classList.remove('hidden');
+    flyToPoint(item.lon, item.lat, 6000);
+  }
+  $('ev-close').addEventListener('click', function () { $('ev-card').classList.add('hidden'); });
+  handler.setInputAction(function (movement) {
+    var picked = scene.pick(movement.position);
+    if (Cesium.defined(picked) && picked.id && picked.id._evidence) {
+      openEvidence(picked.id._evidence);
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  function loadScrubWeather() {
+    if (SCRUB.wx) return;
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=-29.87&longitude=31.05&hourly=wind_speed_10m,wind_gusts_10m&wind_speed_unit=kn&past_days=7&forecast_days=3&timezone=UTC')
+      .then(function (r) { return r.json(); }).then(function (j) { SCRUB.wx = j.hourly || {}; }).catch(function () {});
+    fetch('https://marine-api.open-meteo.com/v1/marine?latitude=-29.87&longitude=31.05&hourly=wave_height,swell_wave_height&past_days=7&forecast_days=3&timezone=UTC')
+      .then(function (r) { return r.json(); }).then(function (j) { SCRUB.marine = j.hourly || {}; }).catch(function () {});
+  }
+  function nearestHourly(series, t) {
+    if (!series || !series.time) return null;
+    var best = null, bd = 1e9;
+    for (var i = 0; i < series.time.length; i++) {
+      var ts = new Date(series.time[i] + 'Z').getTime() / 1000;
+      if (Math.abs(ts - t) < bd) { bd = Math.abs(ts - t); best = i; }
+    }
+    return best;
+  }
+  function loadHistoryDay(dayStr) {
+    if (SCRUB.hist[dayStr]) return SCRUB.hist[dayStr];
+    SCRUB.hist[dayStr] = fetch('data/ais-history/' + dayStr + '.jsonl')
+      .then(function (r) { if (!r.ok) throw 0; return r.text(); })
+      .then(function (txt) {
+        return txt.trim().split('\n').map(function (l) { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
+      }).catch(function () { return []; });
+    return SCRUB.hist[dayStr];
+  }
+  function utcDay(t) { return new Date(t * 1000).toISOString().slice(0, 10); }
+  function clearScrubEntities() {
+    SCRUB.entities.forEach(function (e) { viewer.entities.remove(e); });
+    SCRUB.entities = [];
+  }
+  function applyScrub(t) {
+    SCRUB.t = t;
+    var now = Date.now() / 1000;
+    var isFuture = t > now + 300;
+    var isLive = Math.abs(t - now) < 450;
+    var bar = $('scrub-bar');
+    if (isLive) {
+      SCRUB.active = false;
+      bar.classList.remove('scrubbed');
+      $('scrub-readout').textContent = 'Live - now';
+      clearScrubEntities();
+      vessels.forEach(function (v) { v.entity.show = true; });
+      evidenceEntities.forEach(function (e) { e.show = true; });
+      return;
+    }
+    SCRUB.active = true;
+    bar.classList.add('scrubbed');
+    var label = fmtSAST(t) + ' SAST' + (isFuture ? ' - forecast' : ' - positions as of nearest snapshot');
+    // weather at t
+    var wtxt = '';
+    if (SCRUB.wx && SCRUB.wx.time) {
+      var wi = nearestHourly(SCRUB.wx, t);
+      var mi = SCRUB.marine && SCRUB.marine.time ? nearestHourly(SCRUB.marine, t) : null;
+      if (wi !== null) {
+        wtxt = ' | wind ' + Math.round(SCRUB.wx.wind_speed_10m[wi]) + 'kn';
+        if (mi !== null && SCRUB.marine.wave_height[mi] != null) wtxt += ' | waves ' + SCRUB.marine.wave_height[mi] + 'm';
+      }
+    }
+    $('scrub-readout').textContent = label + wtxt;
+    // vessels at t
+    if (isFuture) {
+      clearScrubEntities();
+      vessels.forEach(function (v) { v.entity.show = true; });
+    } else {
+      Promise.all([loadHistoryDay(utcDay(t)), loadHistoryDay(utcDay(t - 86400))]).then(function (days) {
+        var recs = days[0].concat(days[1]);
+        var best = null, bd = 1e9;
+        recs.forEach(function (r) { if (Math.abs(r.ts - t) < bd) { bd = Math.abs(r.ts - t); best = r; } });
+        if (!best) return;
+        clearScrubEntities();
+        vessels.forEach(function (v) { v.entity.show = false; });
+        (best.vessels || []).forEach(function (vv) {
+          if (vv.lat == null || vv.lon == null) return;
+          SCRUB.entities.push(viewer.entities.add({
+            position: new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(vv.lon, vv.lat)),
+            point: {
+              pixelSize: 7,
+              color: Cesium.Color.fromCssColorString('#94a3b8'),
+              outlineColor: Cesium.Color.fromCssColorString('#38bdf8'), outlineWidth: 1,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY
+            },
+            label: {
+              text: vv.name || '', font: '10px sans-serif',
+              fillColor: Cesium.Color.fromCssColorString('#cbd5e1'),
+              outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              pixelOffset: new Cesium.Cartesian2(0, -14),
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 60000),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY
+            }
+          }));
+        });
+        $('scrub-readout').textContent = fmtSAST(t) + ' SAST | positions as of ' + fmtHour(best.ts) + ' SAST' + wtxt;
+      });
+    }
+    // evidence pins: highlight within 45min, dim future pins
+    evidenceEntities.forEach(function (e) {
+      var dt = e._evidence.ts - t;
+      if (dt > 2700) { e.point.pixelSize = 6; e.point.color = Cesium.Color.fromCssColorString('#f472b6').withAlpha(0.3); }
+      else if (Math.abs(dt) <= 2700) { e.point.pixelSize = 14; e.point.color = Cesium.Color.fromCssColorString('#f472b6'); }
+      else { e.point.pixelSize = 10; e.point.color = Cesium.Color.fromCssColorString('#f472b6').withAlpha(0.75); }
+    });
+  }
+  var slider = $('scrub-slider');
+  var NOW_MIN = Math.floor(Date.now() / 1000) - 48 * 3600;
+  slider.addEventListener('input', function () {
+    loadScrubWeather();
+    applyScrub(NOW_MIN + parseInt(slider.value, 10) * 900);
+  });
+  $('scrub-chip').addEventListener('click', function () {
+    var bar = $('scrub-bar');
+    bar.classList.toggle('hidden');
+    if (bar.classList.contains('hidden') || Math.abs((NOW_MIN + parseInt(slider.value, 10) * 900) - Date.now() / 1000) < 450) {
+      slider.value = 288;
+      applyScrub(Date.now() / 1000);
+    } else {
+      loadScrubWeather();
+      applyScrub(NOW_MIN + parseInt(slider.value, 10) * 900);
+    }
+    $('scrub-min').textContent = fmtSAST(NOW_MIN);
+    $('scrub-max').textContent = fmtSAST(NOW_MIN + 384 * 900);
+  });
+
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);
   var wantVessel = qs.get('vessel');
@@ -823,6 +1022,7 @@
   }
   if (qs.get('replay') === '1') { setTimeout(startReplay, 2500); }
   if (qs.get('cond') === '1') { $('cond-panel').classList.remove('hidden'); loadConditions(); }
+  if (qs.get('scrub') === '1') { $('scrub-chip').click(); }
   if (qs.get('say')) { setTimeout(function () { handleVoiceCommand(qs.get('say')); }, 3000); }
 
   // ---------- start ----------
