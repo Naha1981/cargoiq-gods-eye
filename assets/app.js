@@ -832,7 +832,7 @@
     var msg = 'Something stopped the microphone. Typing below always works.';
     if (err === 'not-allowed' || err === 'service-not-allowed') {
       msg = inIframe
-        ? 'Microphone is blocked inside the CargoIQ page frame. We are fixing that now - type below meanwhile, or open the map directly at nahalabs.co.za/gods-eye.'
+        ? 'Microphone is blocked inside the CargoIQ page frame. We are fixing that now - type below meanwhile, or open the map directly at nahalabs.co.za/harbour-view.'
         : 'Microphone permission denied. Allow the mic for this site in your browser settings, then tap the mic again. Typing below works too.';
     } else if (err === 'audio-capture') {
       msg = 'No microphone found on this device. Typing below works.';
@@ -1130,7 +1130,7 @@
   $('case-close').addEventListener('click', function () { $('case-card').classList.add('hidden'); });
   $('case-replay').addEventListener('click', function () { $('case-card').classList.add('hidden'); startReplay(); });
   $('case-share').addEventListener('click', function () {
-    var url = 'https://nahalabs.co.za/gods-eye/?case=' + CASE.id + '&replay=1';
+    var url = 'https://nahalabs.co.za/harbour-view/?case=' + CASE.id + '&replay=1';
     if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function () {});
     cargoSay('Replay link copied: ' + url, null);
   });
@@ -1164,7 +1164,7 @@
         if (mi !== null && SCRUB.marine.wave_height[mi] != null) { doc.text('Waves ' + SCRUB.marine.wave_height[mi] + ' m', 14, y); y += 5; }
       }
       y += 6;
-      doc.text('Live replay: https://nahalabs.co.za/gods-eye/?case=' + CASE.id + '&replay=1', 14, y);
+      doc.text('Live replay: https://nahalabs.co.za/harbour-view/?case=' + CASE.id + '&replay=1', 14, y);
       doc.save(CASE.id + '-evidence-pack.pdf');
       cargoSay('Evidence pack PDF downloaded for case ' + CASE.id + '.', null);
     } catch (e) {
