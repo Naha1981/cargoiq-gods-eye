@@ -1087,6 +1087,113 @@
   function caseIntent(t) {
     return /everything about|tell me about|show me the case|the case|evidence pack|dossier|msku|musku|482931|4 8 2 9 3 1/.test(t);
   }
+
+  // ---------- item 5: vessel world-line (standing 3D path across history) ----------
+  var worldLine = [];
+  function clearWorldLine() {
+    worldLine.forEach(function (e) { viewer.entities.remove(e); });
+    worldLine = [];
+  }
+  function showWorldLine(mmsi) {
+    clearWorldLine();
+    if (!SCRUB.index || !SCRUB.index.ais_days || !SCRUB.index.ais_days.length) {
+      cargoSay('No AIS history yet. The archive started today and fills in over time.', null);
+      return;
+    }
+    Promise.all(SCRUB.index.ais_days.map(loadHistoryDay)).then(function (days) {
+      var pts = [];
+      days.forEach(function (recs) {
+        recs.forEach(function (r) {
+          (r.vessels || []).forEach(function (vv) {
+            if (String(vv.mmsi) === String(mmsi) && vv.lat != null) pts.push({ ts: r.ts, lat: vv.lat, lon: vv.lon });
+          });
+        });
+      });
+      pts.sort(function (a, b) { return a.ts - b.ts; });
+      if (pts.length < 2) {
+        cargoSay('Only ' + pts.length + ' archived position(s) for this vessel so far. The world-line builds as the archive fills.', null);
+        return;
+      }
+      worldLine.push(viewer.entities.add({
+        polyline: {
+          positions: pts.map(function (p) { return Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 40); }),
+          width: 4,
+          material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.2, color: Cesium.Color.fromCssColorString('#22d3ee') })
+        }
+      }));
+      pts.forEach(function (p) {
+        worldLine.push(viewer.entities.add({
+          position: new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 40)),
+          point: { pixelSize: 5, color: Cesium.Color.fromCssColorString('#22d3ee').withAlpha(0.55), disableDepthTestDistance: Number.POSITIVE_INFINITY },
+          label: {
+            text: fmtHour(p.ts), font: '9px sans-serif',
+            fillColor: Cesium.Color.fromCssColorString('#a5f3fc').withAlpha(0.8),
+            outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            pixelOffset: new Cesium.Cartesian2(0, 12),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 30000),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          }
+        }));
+      });
+      cargoSay('World-line drawn: ' + pts.length + ' archived positions, time-tagged.', null);
+    });
+  }
+  $('vessel-worldline').addEventListener('click', function () {
+    if (!selectedMmsi) return;
+    showWorldLine(selectedMmsi);
+  });
+  $('vessel-worldline-clear').addEventListener('click', clearWorldLine);
+
+  // ---------- item 6: forecast berth-risk layer ----------
+  function loadBerthRisk() {
+    loadScrubWeather();
+    var tries = 0;
+    var poll = setInterval(function () {
+      tries++;
+      if ((!SCRUB.wx || !SCRUB.wx.time || !SCRUB.marine || !SCRUB.marine.time) && tries < 30) return;
+      clearInterval(poll);
+      var el = $('risk-body');
+      if (!SCRUB.wx || !SCRUB.wx.time) { el.innerHTML = '<dt>Status</dt><dd>Forecast unavailable</dd>'; return; }
+      var now = Date.now() / 1000;
+      var html = '';
+      for (var b = 0; b < 8; b++) {
+        var t0 = now + b * 6 * 3600;
+        var worstWind = 0, worstWave = 0;
+        for (var h = 0; h < 6; h++) {
+          var wi = nearestHourly(SCRUB.wx, t0 + h * 3600);
+          var mi = nearestHourly(SCRUB.marine, t0 + h * 3600);
+          if (wi !== null) worstWind = Math.max(worstWind, SCRUB.wx.wind_gusts_10m[wi] || 0);
+          if (mi !== null && SCRUB.marine.wave_height[mi] != null) worstWave = Math.max(worstWave, SCRUB.marine.wave_height[mi]);
+        }
+        var risky = worstWind > 25 || worstWave > 2.5;
+        var d = new Date(t0 * 1000);
+        var lbl = d.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', weekday: 'short', hour: '2-digit', hour12: false });
+        html += '<dt>' + lbl + '</dt><dd style="color:' + (risky ? '#f87171' : '#4ade80') + '">' +
+          (risky ? 'RISK' : 'clear') + ' - gusts ' + Math.round(worstWind) + 'kn, waves ' + worstWave.toFixed(1) + 'm</dd>';
+      }
+      el.innerHTML = html;
+      // forecast-vs-actual delta when an older issued forecast exists
+      if (SCRUB.index && SCRUB.index.forecast_days && SCRUB.index.forecast_days.length > 1) {
+        var older = SCRUB.index.forecast_days[SCRUB.index.forecast_days.length - 2];
+        fetch('data/forecast/' + older + '.json').then(function (r) { return r.json(); }).then(function (old) {
+          if (!old.wx || !old.wx.time) return;
+          var oi = nearestHourly(old.wx, now), ai = nearestHourly(SCRUB.wx, now);
+          if (oi === null || ai === null) return;
+          var delta = Math.round((SCRUB.wx.wind_speed_10m[ai] || 0) - (old.wx.wind_speed_10m[oi] || 0));
+          $('risk-delta').textContent = 'Forecast issued ' + older + ' vs current for now: wind ' + (delta >= 0 ? '+' : '') + delta + ' kn. Forecast-vs-actual builds daily from here.';
+        }).catch(function () {});
+      } else {
+        $('risk-delta').textContent = 'Forecast snapshots are being archived daily; forecast-vs-actual comparison activates from the second day.';
+      }
+    }, 500);
+  }
+  $('risk-btn').addEventListener('click', function () {
+    $('risk-panel').classList.toggle('hidden');
+    if (!$('risk-panel').classList.contains('hidden')) loadBerthRisk();
+  });
+  $('risk-close').addEventListener('click', function () { $('risk-panel').classList.add('hidden'); });
+
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);
   var wantVessel = qs.get('vessel');
@@ -1109,6 +1216,7 @@
   if (qs.get('cond') === '1') { $('cond-panel').classList.remove('hidden'); loadConditions(); }
   if (qs.get('scrub') === '1') { $('scrub-chip').click(); }
   if (qs.get('case')) { setTimeout(openCase, 2200); }
+  if (qs.get('risk') === '1') { $('risk-btn').click(); }
   if (qs.get('say')) { setTimeout(function () { handleVoiceCommand(qs.get('say')); }, 3000); }
 
   // ---------- start ----------

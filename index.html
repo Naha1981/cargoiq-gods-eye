@@ -106,6 +106,14 @@
 </section>
 
 <button id="cond-btn" class="cond-chip" aria-label="Port conditions">CONDITIONS</button>
+  <button id="risk-btn" class="cond-chip" style="right: 14px; top: calc(158px + env(safe-area-inset-top));">BERTH RISK</button>
+  <section id="risk-panel" class="card hidden">
+    <button id="risk-close" class="card-close" aria-label="Close">&times;</button>
+    <h3>Berth window risk - Durban, next 48h</h3>
+    <dl id="risk-body"></dl>
+    <p id="risk-delta" class="card-source"></p>
+    <p class="card-source">Open-Meteo forecast (CC BY 4.0). Risk flag: gusts &gt; 25kn or waves &gt; 2.5m.</p>
+  </section>
 <section id="cond-panel" class="card hidden" aria-live="polite">
   <button id="cond-close" class="card-close" aria-label="Close">&times;</button>
   <h3>Port conditions - Durban</h3>
@@ -130,6 +138,8 @@
   <h3 id="info-title">Vessel</h3>
   <dl id="info-body"></dl>
   <button id="vessel-cam" class="mini-btn">Nearest camera</button>
+  <button id="vessel-worldline" class="mini-btn">World-line</button>
+  <button id="vessel-worldline-clear" class="mini-btn">Clear line</button>
   <p class="card-source">Live AIS position</p>
 </section>
 
