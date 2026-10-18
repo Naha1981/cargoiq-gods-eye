@@ -572,6 +572,7 @@
     CAMERAS.forEach(function (c) { if (c.id === wantCam) { openCam(c); flyToPoint(c.lon, c.lat, 8000); } });
   }
   if (qs.get('replay') === '1') { setTimeout(startReplay, 2500); }
+  if (qs.get('cond') === '1') { $('cond-panel').classList.remove('hidden'); loadConditions(); }
 
   // ---------- start ----------
   setStatus('warm', 'CONNECTING');
