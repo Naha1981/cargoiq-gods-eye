@@ -32,10 +32,12 @@ setInterval(() => {
 }, 25000);
 
 let upstreamLive = false;
+let upstreamAttempts = 0;
 function connectUpstream() {
   const up = new WebSocket('wss://stream.aisstream.io/v0/stream');
   up.on('open', () => {
     upstreamLive = true;
+    upstreamAttempts = 0;
     up.send(JSON.stringify({
       APIKey: KEY,
       BoundingBoxes: BOXES,
@@ -69,8 +71,10 @@ function connectUpstream() {
   });
   up.on('close', () => {
     upstreamLive = false;
-    console.log('upstream closed, retrying in 5s');
-    setTimeout(connectUpstream, 5000);
+    upstreamAttempts = Math.min(upstreamAttempts + 1, 7);
+    const delay = Math.min(5000 * Math.pow(2, upstreamAttempts), 180000) + Math.floor(Math.random() * 3000);
+    console.log('upstream closed, retrying in ' + Math.round(delay / 1000) + 's');
+    setTimeout(connectUpstream, delay);
   });
   up.on('error', (e) => {
     console.error('upstream error:', e.message);
