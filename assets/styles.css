@@ -115,6 +115,7 @@ body {
 .hidden { display: none !important; }
 
 @media (max-width: 768px) {
+  .flybtn { padding: 9px 11px; font-size: 12px; }
   .card { top: auto; bottom: calc(84px + env(safe-area-inset-bottom)); right: 14px; left: 14px; width: auto; }
   #hud-flyto { bottom: calc(12px + env(safe-area-inset-bottom)); }
   .count-chip { display: none; }

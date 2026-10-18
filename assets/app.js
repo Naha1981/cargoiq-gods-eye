@@ -116,8 +116,8 @@
           outlineWidth: 3,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           pixelOffset: new Cesium.Cartesian2(0, -16),
-          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 90000),
-          scaleByDistance: new Cesium.NearFarScalar(2000, 1.0, 90000, 0.7),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 26000),
+          scaleByDistance: new Cesium.NearFarScalar(2000, 1.0, 26000, 0.7),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
         }
       });
