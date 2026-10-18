@@ -47,7 +47,7 @@
       infoBox: false,
       selectionIndicator: false,
       shouldAnimate: false,
-      sceneMode: isMobile ? Cesium.SceneMode.SCENE2D : Cesium.SceneMode.SCENE3D,
+      sceneMode: Cesium.SceneMode.SCENE3D,
       requestRenderMode: true,
       maximumRenderTimeChange: Infinity
     });
@@ -65,6 +65,11 @@
   }).catch(function () { /* ellipsoid fallback */ });
 
   if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = !isMobile;
+  if (isMobile) {
+    viewer.resolutionScale = 0.8;
+    setTimeout(function () { $('desktop-note').classList.remove('hidden'); }, 2500);
+  }
+  $('desktop-note-ok').addEventListener('click', function () { $('desktop-note').classList.add('hidden'); });
   viewer.scene.globe.enableLighting = false;
   viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0f1a');
   viewer.scene.screenSpaceCameraController.minimumZoomDistance = 250;
@@ -129,6 +134,12 @@
       if (rec.name) v.entity.label.text = rec.name;
       v.rec = rec;
     }
+    var hist = v.history || (v.history = []);
+    var last = hist[hist.length - 1];
+    if (!last || last.lon !== rec.lon || last.lat !== rec.lat) {
+      hist.push({ lon: rec.lon, lat: rec.lat });
+      if (hist.length > 60) hist.shift();
+    }
   }
 
   function updateCount() {
@@ -175,13 +186,59 @@
     $('info-card').classList.add('hidden');
     $('dispute-card').classList.add('hidden');
     selectedMmsi = null;
+    stopTrack();
     drawHeading(null);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  var trailEntity = null, ringEntity = null;
+  function startTrack(mmsi) {
+    var v = vessels.get(mmsi);
+    if (!v) return;
+    selectedMmsi = mmsi;
+    viewer.trackedEntity = v.entity;
+    $('track-name').textContent = (v.rec.name || ('MMSI ' + mmsi)) + ' - tracking';
+    $('track-chip').classList.remove('hidden');
+    if (trailEntity) viewer.entities.remove(trailEntity);
+    trailEntity = viewer.entities.add({
+      polyline: {
+        positions: new Cesium.CallbackProperty(function () {
+          var vv = vessels.get(mmsi);
+          if (!vv || !vv.history || vv.history.length < 2) return [];
+          return vv.history.map(function (p) { return Cesium.Cartesian3.fromDegrees(p.lon, p.lat); });
+        }, false),
+        width: 3,
+        material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.18, color: Cesium.Color.fromCssColorString('#38bdf8') }),
+        clampToGround: false
+      }
+    });
+    if (ringEntity) viewer.entities.remove(ringEntity);
+    ringEntity = viewer.entities.add({
+      position: new Cesium.CallbackProperty(function () {
+        var vv = vessels.get(mmsi);
+        return vv ? vv.entity.position.getValue() : null;
+      }, false),
+      ellipse: {
+        semiMajorAxis: 900, semiMinorAxis: 900,
+        height: 0,
+        material: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.0),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.8),
+        outlineWidth: 3
+      }
+    });
+  }
+  function stopTrack() {
+    viewer.trackedEntity = undefined;
+    $('track-chip').classList.add('hidden');
+    if (trailEntity) { viewer.entities.remove(trailEntity); trailEntity = null; }
+    if (ringEntity) { viewer.entities.remove(ringEntity); ringEntity = null; }
+  }
+  $('track-stop').addEventListener('click', function () { stopTrack(); });
 
   function showVessel(mmsi) {
     var v = vessels.get(mmsi);
     if (!v) return;
-    selectedMmsi = mmsi;
+    startTrack(mmsi);
     var r = v.rec;
     $('info-title').textContent = r.name || ('MMSI ' + mmsi);
     var sog = (typeof r.sog === 'number') ? r.sog.toFixed(1) + ' kn' : '-';
@@ -224,12 +281,11 @@
   function flyTo(target) {
     var t = VIEW[target];
     if (!t) return;
-    var is2D = scene.mode === Cesium.SceneMode.SCENE2D;
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.alt),
       orientation: {
         heading: 0,
-        pitch: is2D ? Cesium.Math.toRadians(-90) : Cesium.Math.toRadians(-58),
+        pitch: Cesium.Math.toRadians(-58),
         roll: 0
       },
       duration: 2.4
@@ -352,6 +408,167 @@
     }
     if (!scene.isDestroyed()) scene.requestRender();
   }, 1500);
+
+
+  // ---------- CCTV (verified free public cameras, refreshing stills) ----------
+  var CAMERAS = [
+    { id: 'vetchs', name: "Vetch's Pier - Durban harbour mouth", lon: 31.0570, lat: -29.8690,
+      img: 'https://durbancoastlive.com/incoming/vetchs/vetchs.jpg', source: 'Durban Coast Live - still frame, refreshes periodically' },
+    { id: 'bluewaters', name: 'Blue Waters - Durban beachfront', lon: 31.0378, lat: -29.8362,
+      img: 'https://durbancoastlive.com/incoming/blueWaters/bwSouth.jpg', source: 'Durban Coast Live - still frame, refreshes periodically' }
+  ];
+  var camEntities = [];
+  var camRefreshTimer = null;
+  CAMERAS.forEach(function (cam) {
+    var ent = viewer.entities.add({
+      position: new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat)),
+      point: {
+        pixelSize: 9,
+        color: Cesium.Color.fromCssColorString('#f59e0b'),
+        outlineColor: Cesium.Color.WHITE, outlineWidth: 1.5,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      label: {
+        text: 'CAM', font: 'bold 10px sans-serif',
+        fillColor: Cesium.Color.fromCssColorString('#fbbf24'),
+        outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(0, -18),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 120000),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      }
+    });
+    cam._entity = ent;
+    camEntities.push(ent);
+  });
+  function openCam(cam) {
+    $('cam-title').textContent = cam.name;
+    $('cam-source').textContent = cam.source + ' - position approximate';
+    var img = $('cam-img');
+    var bust = function () { img.src = cam.img + '?t=' + Date.now(); };
+    bust();
+    if (camRefreshTimer) clearInterval(camRefreshTimer);
+    camRefreshTimer = setInterval(bust, 10000);
+    $('cam-panel').classList.remove('hidden');
+  }
+  function closeCam() {
+    $('cam-panel').classList.add('hidden');
+    if (camRefreshTimer) { clearInterval(camRefreshTimer); camRefreshTimer = null; }
+  }
+  $('cam-close').addEventListener('click', closeCam);
+  function nearestCamTo(lon, lat) {
+    var best = null, bd = 1e9;
+    CAMERAS.forEach(function (c) {
+      var d = (c.lon - lon) * (c.lon - lon) + (c.lat - lat) * (c.lat - lat);
+      if (d < bd) { bd = d; best = c; }
+    });
+    return best;
+  }
+  $('dispute-cam').addEventListener('click', function () {
+    var c = nearestCamTo(DISPUTE.lon, DISPUTE.lat);
+    if (c) { openCam(c); flyToPoint(c.lon, c.lat, 6000); }
+  });
+  $('vessel-cam').addEventListener('click', function () {
+    if (!selectedMmsi) return;
+    var v = vessels.get(selectedMmsi);
+    if (!v) return;
+    var c = nearestCamTo(v.rec.lon, v.rec.lat);
+    if (c) { openCam(c); flyToPoint(c.lon, c.lat, 6000); }
+  });
+  function flyToPoint(lon, lat, alt) {
+    viewer.trackedEntity = undefined;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
+      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 },
+      duration: 2.2
+    });
+  }
+  handler.setInputAction(function (movement) {
+    var picked = scene.pick(movement.position);
+    if (Cesium.defined(picked) && picked.id) {
+      var cam = null;
+      CAMERAS.forEach(function (c) { if (c._entity === picked.id) cam = c; });
+      if (cam) { openCam(cam); return; }
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  // ---------- Port conditions (Open-Meteo, keyless, CC BY 4.0) ----------
+  function loadConditions() {
+    var marine = fetch('https://marine-api.open-meteo.com/v1/marine?latitude=-29.87&longitude=31.05&current=wave_height,wave_period,wave_direction,swell_wave_height&timezone=Africa%2FJohannesburg').then(function (r) { return r.json(); });
+    var wx = fetch('https://api.open-meteo.com/v1/forecast?latitude=-29.87&longitude=31.05&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&timezone=Africa%2FJohannesburg&wind_speed_unit=kn').then(function (r) { return r.json(); });
+    Promise.all([marine, wx]).then(function (res) {
+      var m = res[0].current || {}, w = res[1].current || {};
+      var dirs = ['N','NE','E','SE','S','SW','W','NW'];
+      var compass = function (deg) { return (typeof deg === 'number') ? dirs[Math.round(deg / 45) % 8] : '-'; };
+      $('cond-body').innerHTML =
+        '<dt>Waves</dt><dd>' + (m.wave_height != null ? m.wave_height + ' m' : '-') + ' / ' + (m.wave_period != null ? m.wave_period + ' s' : '-') + ' ' + compass(m.wave_direction) + '</dd>' +
+        '<dt>Swell</dt><dd>' + (m.swell_wave_height != null ? m.swell_wave_height + ' m' : '-') + '</dd>' +
+        '<dt>Wind</dt><dd>' + (w.wind_speed_10m != null ? Math.round(w.wind_speed_10m) + ' kn' : '-') + ' ' + compass(w.wind_direction_10m) + (w.wind_gusts_10m != null ? ' (gusts ' + Math.round(w.wind_gusts_10m) + ' kn)' : '') + '</dd>' +
+        '<dt>Updated</dt><dd>' + ((m.time || w.time || '').replace('T', ' ')) + '</dd>';
+    }).catch(function () {
+      $('cond-body').innerHTML = '<dt>Status</dt><dd>Conditions feed unavailable</dd>';
+    });
+  }
+  $('cond-btn').addEventListener('click', function () {
+    $('cond-panel').classList.toggle('hidden');
+    if (!$('cond-panel').classList.contains('hidden')) loadConditions();
+  });
+  $('cond-close').addEventListener('click', function () { $('cond-panel').classList.add('hidden'); });
+
+  // ---------- Case replay (fictional DUR-2026-0412) ----------
+  var REPLAY = [
+    { t: 'Day 1, 06:12', title: 'Arrival - outer anchorage', desc: 'MV Umhlanga Trader arrives off Durban and waits for a berth. The delay clock dispute starts here.', lon: 31.175, lat: -29.795, alt: 22000 },
+    { t: 'Day 1, 14:40', title: 'Berthing - DGT berth 108', desc: 'Vessel berths at Durban Container Terminal. The terminal says the berth was ready earlier; the carrier disagrees.', lon: 31.0393, lat: -29.8702, alt: 7000 },
+    { t: 'Day 1, 18:05', title: 'Free time expires', desc: 'Container MSKU 482931 7: free time expires while the parties dispute whose clock counts.', lon: 31.0395, lat: -29.8698, alt: 2600 },
+    { t: 'Day 2, 09:15', title: 'Demurrage invoice issued', desc: 'Invoice raised. The evidence pack stays BLOCKED while 2 contradictions remain open.', lon: 31.0395, lat: -29.8698, alt: 2600 }
+  ];
+  var replayTimer = null, replayIdx = -1;
+  function replayStep() {
+    if (replayIdx >= REPLAY.length) { stopReplay(); return; }
+    var ev = REPLAY[replayIdx];
+    $('replay-title').textContent = 'Step ' + (replayIdx + 1) + ' of ' + REPLAY.length + ' - ' + ev.title;
+    $('replay-desc').textContent = ev.t + '. ' + ev.desc;
+    $('replay-card').classList.remove('hidden');
+    flyToPoint(ev.lon, ev.lat, ev.alt);
+    replayIdx++;
+    replayTimer = setTimeout(replayStep, 5200);
+  }
+  function startReplay() {
+    stopReplay();
+    replayIdx = 0;
+    $('replay-btn').innerHTML = '&#9632; Stop replay';
+    replayStep();
+  }
+  function stopReplay() {
+    if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
+    replayIdx = -1;
+    $('replay-btn').innerHTML = '&#9654; Replay case DUR-2026-0412';
+    $('replay-card').classList.add('hidden');
+  }
+  $('replay-btn').addEventListener('click', function () {
+    if (replayIdx >= 0) stopReplay(); else startReplay();
+  });
+  $('replay-close').addEventListener('click', stopReplay);
+
+  // ---------- deep links ----------
+  var qs = new URLSearchParams(location.search);
+  var wantVessel = qs.get('vessel');
+  if (wantVessel) {
+    var tries = 0;
+    var poll = setInterval(function () {
+      tries++;
+      if (vessels.has(wantVessel)) {
+        clearInterval(poll);
+        showVessel(wantVessel);
+        flyToPoint(vessels.get(wantVessel).rec.lon, vessels.get(wantVessel).rec.lat, 15000);
+      } else if (tries > 40) { clearInterval(poll); }
+    }, 2000);
+  }
+  var wantCam = qs.get('cam');
+  if (wantCam) {
+    CAMERAS.forEach(function (c) { if (c.id === wantCam) { openCam(c); flyToPoint(c.lon, c.lat, 8000); } });
+  }
+  if (qs.get('replay') === '1') { setTimeout(startReplay, 2500); }
 
   // ---------- start ----------
   setStatus('warm', 'CONNECTING');

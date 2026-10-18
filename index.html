@@ -33,10 +33,43 @@
 
 <div id="vessel-count" class="count-chip">0 vessels</div>
 
+<div id="track-chip" class="track-chip hidden">
+  <span class="track-dot"></span><span id="track-name">Tracking</span>
+  <button id="track-stop" aria-label="Stop tracking">STOP</button>
+</div>
+
+<section id="cam-panel" class="card hidden" aria-live="polite">
+  <button id="cam-close" class="card-close" aria-label="Close">&times;</button>
+  <h3 id="cam-title">Camera</h3>
+  <div class="cam-frame"><img id="cam-img" alt="Live camera frame"></div>
+  <p class="card-source" id="cam-source">Live public camera</p>
+</section>
+
+<button id="cond-btn" class="cond-chip" aria-label="Port conditions">CONDITIONS</button>
+<section id="cond-panel" class="card hidden" aria-live="polite">
+  <button id="cond-close" class="card-close" aria-label="Close">&times;</button>
+  <h3>Port conditions - Durban</h3>
+  <dl id="cond-body"></dl>
+  <p class="card-source">Open-Meteo marine &amp; weather (CC BY 4.0)</p>
+</section>
+
+<button id="replay-btn" class="replay-chip">&#9654; Replay case DUR-2026-0412</button>
+<section id="replay-card" class="card hidden" aria-live="polite">
+  <button id="replay-close" class="card-close" aria-label="Close">&times;</button>
+  <h3 id="replay-title">Replay</h3>
+  <p id="replay-desc" class="replay-desc"></p>
+  <p class="card-source">Sample data. Fictional records.</p>
+</section>
+
+<div id="desktop-note" class="desktop-note hidden">
+  Full 3D globe - best experienced on desktop. <button id="desktop-note-ok">Got it</button>
+</div>
+
 <section id="info-card" class="card hidden" aria-live="polite">
   <button id="info-close" class="card-close" aria-label="Close">&times;</button>
   <h3 id="info-title">Vessel</h3>
   <dl id="info-body"></dl>
+  <button id="vessel-cam" class="mini-btn">Nearest camera</button>
   <p class="card-source">Live AIS position</p>
 </section>
 
@@ -49,6 +82,7 @@
     <dt>Issue</dt><dd>Demurrage: free-time expiry vs berthing delay</dd>
     <dt>Status</dt><dd>2 open contradictions on the evidence timeline</dd>
   </dl>
+  <button id="dispute-cam" class="mini-btn">Nearest camera</button>
   <p class="card-source">Sample data. Fictional records.</p>
 </section>
 
