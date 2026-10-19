@@ -28,9 +28,11 @@ except Exception as e:
     print("ais history failed:", e)
 
 # 2. Camera stills, one per hour, 48h retention
+# Sources: Point Yacht Club live streams (CC BY 4.0, restreamer.cd.net.za) - one frame via ffmpeg.
+import subprocess
 CAMS = {
-    "vetchs": "https://durbancoastlive.com/incoming/vetchs/vetchs.jpg",
-    "bluewaters": "https://durbancoastlive.com/incoming/blueWaters/bwSouth.jpg",
+    "vetchs": "https://restreamer.cd.net.za/memfs/c1b53a50-06bb-47da-916a-01fb19d5c547.m3u8",
+    "bluewaters": "https://restreamer.cd.net.za/memfs/7bd8fb34-74b3-4158-abc0-06fbbc8ffb2b.m3u8",
 }
 for cid, url in CAMS.items():
     try:
@@ -39,13 +41,19 @@ for cid, url in CAMS.items():
         slot = int(NOW // 3600)
         path = f"{d}/{slot}.jpg"
         if not os.path.exists(path):
-            img = fetch(url, binary=True)
-            if len(img) > 5000:
-                with open(path, "wb") as f:
-                    f.write(img)
-        for p in glob.glob(f"{d}/*.jpg"):
-            if int(os.path.basename(p).split(".")[0]) < slot - 48:
-                os.remove(p)
+            subprocess.run(
+                ["ffmpeg", "-y", "-loglevel", "error", "-timeout", "15000000",
+                 "-i", url, "-frames:v", "1", "-q:v", "3", path],
+                check=True, timeout=60)
+            if os.path.getsize(path) < 5000:
+                os.remove(path)
+                raise RuntimeError("frame too small")
+        # latest.jpg for the map camera panel fallback
+        subprocess.run(["cp", path, f"{d}/latest.jpg"], check=True)
+        for p_ in glob.glob(f"{d}/*.jpg"):
+            base = os.path.basename(p_).split(".")[0]
+            if base != "latest" and int(base) < slot - 48:
+                os.remove(p_)
         print(f"cam {cid} archived")
     except Exception as e:
         print(f"cam {cid} failed:", e)
