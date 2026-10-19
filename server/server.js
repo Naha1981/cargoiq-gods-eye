@@ -4,8 +4,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 // ---------- /tts (fish.audio clone voice, cache-first, rate limited) ----------
 const FISH_KEY = process.env.FISH_API_KEY || '';
-const FISH_REF = process.env.FISH_REFERENCE_ID || '18ae993ac5114994a4807d96b8140905';
-const TTS_ORIGINS = new Set(['https://nahalabs.co.za', 'https://www.nahalabs.co.za', 'https://cargo-iq.lovable.app']);
+const FISH_REF = process.env.FISH_REFERENCE_ID || '';
+const TTS_ORIGINS = new Set(['https://nahalabs.co.za', 'https://www.nahalabs.co.za', 'https://cargoiq.nahalabs.co.za', 'https://cargo-iq.lovable.app']);
 const TTS_MAX_TEXT = 500;
 const TTS_PER_IP_PER_MIN = 20;
 const TTS_DAILY_CAP = 300;
@@ -35,7 +35,7 @@ async function handleTts(req, res) {
   if (req.method === 'OPTIONS') { res.writeHead(allowed ? 204 : 403); res.end(); return; }
   if (!allowed) { res.writeHead(403, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'origin' })); return; }
   if (req.method !== 'POST') { res.writeHead(405); res.end(); return; }
-  if (!FISH_KEY) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'tts-disabled' })); return; }
+  if (!FISH_KEY || !FISH_REF) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'tts-disabled' })); return; }
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   if (!ttsAllowed(ip)) { res.writeHead(429, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'rate-limited' })); return; }
   let body = '';
