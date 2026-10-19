@@ -18,6 +18,8 @@ jobs:
         env:
           AIS_KEY: ${{ secrets.AISSTREAM_API_KEY }}
         run: python3 collector/collect.py 150
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Archive history, cameras, forecast
         run: python3 collector/archive.py
       - name: Commit refreshed snapshot

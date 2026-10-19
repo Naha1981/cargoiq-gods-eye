@@ -80,7 +80,7 @@ except Exception as e:
 # 4. Scrub index
 idx = {"generated_at": int(NOW),
        "ais_days": sorted(os.path.basename(p)[:-6] for p in glob.glob("data/ais-history/*.jsonl")),
-       "cam": {cid: sorted(int(os.path.basename(p)[:-4]) for p in glob.glob(f"data/cam/{cid}/*.jpg")) for cid in CAMS},
+       "cam": {cid: sorted(int(os.path.basename(p)[:-4]) for p in glob.glob(f"data/cam/{cid}/*.jpg") if os.path.basename(p)[:-4].isdigit()) for cid in CAMS},
        "forecast_days": sorted(os.path.basename(p)[:-5] for p in glob.glob("data/forecast/*.json"))}
 with open("data/scrub-index.json", "w") as f:
     json.dump(idx, f)
