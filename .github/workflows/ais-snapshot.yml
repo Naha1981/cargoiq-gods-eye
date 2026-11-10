@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch: {}
+concurrency:
+  group: ais-snapshot-${{ github.ref }}
+  cancel-in-progress: false
 permissions:
   contents: write
 jobs:
@@ -27,4 +30,11 @@ jobs:
           git config user.name "NahaLabs automation"
           git config user.email "ai-solutions@nahalabs.co.za"
           git add data/
-          if git diff --cached --quiet; then echo "no change"; else git commit -m "AIS + evidence archive refresh $(date -u +'%Y-%m-%d %H:%M UTC')"; git push; fi
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "AIS + evidence archive refresh $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
