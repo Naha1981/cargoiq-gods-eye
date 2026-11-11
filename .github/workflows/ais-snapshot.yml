@@ -26,8 +26,16 @@ jobs:
         env:
           AIS_KEY: ${{ secrets.AISSTREAM_API_KEY }}
         run: python3 collector/collect.py 150
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Ensure ffmpeg without blocking AIS publication
+        run: |
+          set -eu
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -version | head -n 1
+          elif timeout 120s bash -c 'sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update && sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 install -y --no-install-recommends ffmpeg'; then
+            ffmpeg -version | head -n 1
+          else
+            echo '::warning::ffmpeg installation unavailable within 120s; AIS/history/forecast will still publish. Camera capture remains best-effort; existing images are retained.'
+          fi
       - name: Archive history, cameras, forecast
         run: python3 collector/archive.py
       - name: Commit refreshed snapshot
